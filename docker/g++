@@ -9,9 +9,8 @@ do
     fi
 done
 
-ARCH=native
 if [[ $(uname -m) == "aarch64" ]]; then
     ARCH=armv8-a
 fi
 
-/usr/bin/g++_real -march=$ARCH "${args[@]}"
+/usr/bin/g++_real --verbose "${args[@]}"
