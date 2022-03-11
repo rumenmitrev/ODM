@@ -146,6 +146,11 @@ install() {
             sudo mv -v /usr/bin/g++ /usr/bin/g++_real
             sudo cp -v ./docker/g++ /usr/bin/g++
         fi
+        if [ ! -e /usr/local/cuda/bin/nvcc_real ]; then
+            sudo mv -v /usr/local/cuda/bin/nvcc /usr/local/cuda/bin/nvcc_real
+            sudo cp -v ./docker/nvcc /usr/local/cuda/bin/nvcc
+            sudo cp -v ./docker/nvcc /usr/bin/nvcc
+        fi
     fi
 
     set -eo pipefail
