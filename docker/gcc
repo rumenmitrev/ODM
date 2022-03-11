@@ -13,4 +13,4 @@ if [[ $(uname -m) == "aarch64" ]]; then
     ARCH=armv8-a
 fi
 
-/usr/bin/gcc_real --verbose "${args[@]}"
+/usr/bin/gcc_real "${args[@]}"
