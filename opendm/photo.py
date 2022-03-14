@@ -329,7 +329,9 @@ class ODM_Photo:
                         '@drone-dji:Latitude'
                     ], float)
                     self.set_attr_from_xmp_tag('altitude', xtags, [
-                        '@drone-dji:AbsoluteAltitude'
+                        #'@drone-dji:AbsoluteAltitude'
+                        ## DJI M2P use RelativeAltitude
+                        '@drone-dji:RelativeAltitude'
                     ], float)
 
                     # Phantom 4 RTK
