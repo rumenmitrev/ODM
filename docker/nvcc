@@ -1,0 +1,12 @@
+#!/bin/bash
+
+declare -a args
+
+for i in "$@"
+do
+    if [[ "$i" != -march* ]]; then
+        args+=("$i")
+    fi
+done
+
+/usr/local/cuda/bin/nvcc_real -arch=sm_50 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_52,code=sm_52 -Wno-deprecated-gpu-targets "${args[@]}"

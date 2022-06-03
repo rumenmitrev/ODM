@@ -359,7 +359,9 @@ class ODM_Photo:
                         '@drone-dji:Latitude'
                     ], float)
                     self.set_attr_from_xmp_tag('altitude', xtags, [
-                        '@drone-dji:AbsoluteAltitude'
+                        #'@drone-dji:AbsoluteAltitude'
+                        ## DJI M2P use RelativeAltitude
+                        '@drone-dji:RelativeAltitude'
                     ], float)
 
                     # Phantom 4 RTK
@@ -382,9 +384,9 @@ class ODM_Photo:
                     
                     # Account for over-estimation
                     if self.gps_xy_stddev is not None:
-                        self.gps_xy_stddev *= 2.0
+                        self.gps_xy_stddev *= 1.0
                     if self.gps_z_stddev is not None:
-                        self.gps_z_stddev *= 2.0
+                        self.gps_z_stddev *= 1.0
 
                     if 'DLS:Yaw' in xtags:
                         self.set_attr_from_xmp_tag('dls_yaw', xtags, ['DLS:Yaw'], float)
