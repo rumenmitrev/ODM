@@ -157,7 +157,7 @@ install() {
     echo "Compiling SuperBuild"
     cd ${RUNPATH}/SuperBuild
     mkdir -p build && cd build
-    cmake .. && make -j$processes
+    cmake -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON .. && make -j$processes VERBOSE=1
 
     echo "Configuration Finished"
 }
