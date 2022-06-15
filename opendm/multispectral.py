@@ -25,13 +25,11 @@ def dn_to_radiance(photo, image):
     image = image.astype("float32")
     if len(image.shape) != 3:
         raise ValueError("Image should have shape length of 3 (got: %s)" % len(image.shape))
-
-    # Handle thermal bands (experimental)
-    if photo.band_name == 'LWIR':
-        image -= (273.15 * 100.0) # Convert Kelvin to Celsius
-        image *= 0.01
-        return image
     
+    # Thermal (this should never happen, but just in case..)
+    if photo.is_thermal():
+        return image
+
     # All others
     a1, a2, a3 = photo.get_radiometric_calibration()
     dark_level = photo.get_dark_level()
@@ -55,9 +53,9 @@ def dn_to_radiance(photo, image):
         image -= dark_level
 
     # Normalize DN to 0 - 1.0
-    bit_depth_max = photo.get_bit_depth_max()
-    if bit_depth_max:
-        image /= bit_depth_max
+    # bit_depth_max = photo.get_bit_depth_max()
+    # if bit_depth_max:
+    #    image /= bit_depth_max
 
     if V is not None:
         # vignette correction
@@ -460,7 +458,7 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
 
         try:
             log.ODM_INFO("Computing ECC pyramid level %s" % level)
-            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=9)
+            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=5)
         except Exception as e:
             if level != pyramid_levels:
                 log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
@@ -534,9 +532,9 @@ def local_normalize(im):
 
 def align_image(image, warp_matrix, dimension):
     if warp_matrix.shape == (3, 3):
-        return cv2.warpPerspective(image, warp_matrix, dimension)
+        return cv2.warpPerspective(image, warp_matrix, dimension, flags=cv2.INTER_LANCZOS4 + cv2.WARP_INVERSE_MAP)
     else:
-        return cv2.warpAffine(image, warp_matrix, dimension)
+        return cv2.warpAffine(image, warp_matrix, dimension, flags=cv2.INTER_LANCZOS4 + cv2.WARP_INVERSE_MAP)
 
 
 def to_8bit(image, force_normalize=False):
