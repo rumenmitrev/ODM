@@ -532,9 +532,9 @@ def local_normalize(im):
 
 def align_image(image, warp_matrix, dimension):
     if warp_matrix.shape == (3, 3):
-        return cv2.warpPerspective(image, warp_matrix, dimension, flags=cv2.INTER_LANCZOS4 + cv2.WARP_INVERSE_MAP)
+        return cv2.warpPerspective(image, warp_matrix, dimension)
     else:
-        return cv2.warpAffine(image, warp_matrix, dimension, flags=cv2.INTER_LANCZOS4 + cv2.WARP_INVERSE_MAP)
+        return cv2.warpAffine(image, warp_matrix, dimension)
 
 
 def to_8bit(image, force_normalize=False):
