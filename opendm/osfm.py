@@ -40,15 +40,19 @@ class OSFMContext:
 
         return io.file_exists(tracks_file) and io.file_exists(reconstruction_file)
 
-    def reconstruct(self, rerun=False):
+    def create_tracks(self, rerun=False):
         tracks_file = os.path.join(self.opensfm_project_path, 'tracks.csv')
-        reconstruction_file = os.path.join(self.opensfm_project_path, 'reconstruction.json')
+        rs_file = self.path('rs_done.txt')
 
         if not io.file_exists(tracks_file) or rerun:
             self.run('create_tracks')
         else:
             log.ODM_WARNING('Found a valid OpenSfM tracks file in: %s' % tracks_file)
 
+    def reconstruct(self, rolling_shutter_correct=False, rerun=False):
+        # TODO: FIX calls from split-merge
+
+        reconstruction_file = os.path.join(self.opensfm_project_path, 'reconstruction.json')
         if not io.file_exists(reconstruction_file) or rerun:
             self.run('reconstruct')
             self.check_merge_partial_reconstructions()
@@ -63,6 +67,21 @@ class OSFMContext:
                             "and that the images are in focus. "
                             "You could also try to increase the --min-num-features parameter."
                             "The program will now exit.")
+
+        if rolling_shutter_correct:
+            rs_file = self.path('rs_done.txt')
+
+            if not io.file_exists(rs_file) or rerun:
+                self.run('rs_correct --output reconstruction.json --output-tracks tracks.csv')
+
+                log.ODM_INFO("Re-running the reconstruction pipeline")
+                self.match_features(True)
+                self.create_tracks(True)
+                self.reconstruct(rolling_shutter_correct=False, rerun=True)
+
+                self.touch(rs_file)
+            else:
+                log.ODM_WARNING("Rolling shutter correction already applied")
 
     def check_merge_partial_reconstructions(self):
         if self.reconstructed():
@@ -289,6 +308,9 @@ class OSFMContext:
                 config.append("bundle_use_gcp: yes")
                 if not args.force_gps:
                     config.append("bundle_use_gps: no")
+                else:
+                    config.append("bundle_compensate_gps_bias: yes")
+
                 io.copy(gcp_path, self.path("gcp_list.txt"))
             
             config = config + append_config
@@ -365,7 +387,6 @@ class OSFMContext:
 
     def feature_matching(self, rerun=False):
         features_dir = self.path("features")
-        matches_dir = self.path("matches")
         
         if not io.dir_exists(features_dir) or rerun:
             try:
@@ -383,6 +404,10 @@ class OSFMContext:
         else:
             log.ODM_WARNING('Detect features already done: %s exists' % features_dir)
 
+        self.match_features(rerun)
+
+    def match_features(self, rerun=False):
+        matches_dir = self.path("matches")
         if not io.dir_exists(matches_dir) or rerun:
             self.run('match_features')
         else:
