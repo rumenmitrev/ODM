@@ -72,9 +72,10 @@ class OSFMContext:
             rs_file = self.path('rs_done.txt')
 
             if not io.file_exists(rs_file) or rerun:
-                self.run('rs_correct --output reconstruction.json --output-tracks tracks.csv')
+                self.run('rs_correct')
 
                 log.ODM_INFO("Re-running the reconstruction pipeline")
+
                 self.match_features(True)
                 self.create_tracks(True)
                 self.reconstruct(rolling_shutter_correct=False, rerun=True)
@@ -310,7 +311,7 @@ class OSFMContext:
                     config.append("bundle_use_gps: no")
                 else:
                     config.append("bundle_compensate_gps_bias: yes")
-
+                    
                 io.copy(gcp_path, self.path("gcp_list.txt"))
             
             config = config + append_config
