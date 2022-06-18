@@ -232,6 +232,8 @@ def compute_band_maps(multi_camera, primary_band):
 
                 if band['name'] != band_name:
                     p2s.setdefault(unique_id_map[uuid].filename, []).append(p)
+                    
+                log.ODM_INFO("File %s <-- Capture %s" % (p.filename, uuid))    
 
         return s2p, p2s
     except Exception as e:
