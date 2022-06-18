@@ -408,7 +408,7 @@ def compute_homography(image_filename, align_image_filename):
         log.ODM_WARNING("Compute homography: %s" % str(e))
         return None, (None, None), None
 
-def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000, termination_eps=1e-8, start_eps=1e-4):
+def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=2500, termination_eps=1e-9, start_eps=1e-4):
     pyramid_levels = 0
     h,w = image_gray.shape
     min_dim = min(h, w)
@@ -457,14 +457,18 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
                 number_of_iterations, eps)
 
         try:
-            log.ODM_INFO("Computing ECC pyramid level %s" % level)
-            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=5)
-        except Exception as e:
-            if level != pyramid_levels:
-                log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
-                warp_matrix = np.eye(3, 3, dtype=np.float32)
-            else:
-                raise e
+            log.ODM_INFO("Computing ECC pyramid level %s with Gauss filter size 1" % level)
+            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=1)
+        except TypeError:
+            try: # Fallback to default gaussFilterSize=5
+                log.ODM_INFO("Computing ECC pyramid level %s with Gauss filter size 5" % level)
+                _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria)
+            except Exception as e:
+                if level != pyramid_levels:
+                    log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
+                    warp_matrix = np.eye(3, 3, dtype=np.float32)
+                else:
+                    raise e
 
         if level != pyramid_levels: 
             warp_matrix = warp_matrix * np.array([[1,1,2],[1,1,2],[0.5,0.5,1]], dtype=np.float32)
