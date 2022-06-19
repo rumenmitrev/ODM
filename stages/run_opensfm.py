@@ -131,7 +131,7 @@ class ODMOpenSfMStage(types.ODM_Stage):
 
             ainfo_band = alignment_info.get(photo.band_name)
             if ainfo_band is not None:
-                ainfo_shot = ainfo_band.get('filename', shot_id)
+                ainfo_shot = next((item for item in ainfo_band if item['filename'] == shot_id), None) # alignment_info is a dictionary but ainfo_band is a list
                 if ainfo_shot is not None:
                     return multispectral.align_image(image, ainfo_shot['warp_matrix'], ainfo_shot['dimension'])
                 else:
