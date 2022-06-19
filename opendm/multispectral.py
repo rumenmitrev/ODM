@@ -301,8 +301,7 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
                         log.ODM_INFO("%s --> %s good match" % (p['filename'], primary_band_photo.filename))
 
                         matrices_samples.append({
-                            'capture_id': p.get_capture_id(),
-                            'filename': p['filename'],
+                            'filename': p['filename'], # assume file name is unique
                             'warp_matrix': warp_matrix,
                             'eigvals': np.linalg.eigvals(warp_matrix),
                             'dimension': dimension,
@@ -335,14 +334,13 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
                 # Alignment matrices for all shots
                 matrices_all = []
                 for photo in band['photos']:
-                    matrix = matrices_samples.get('capture_id', photo.get_capture_id())
+                    matrix = matrices_samples.get('filename', photo['filename'])
                     # Thermal photo uses individual photo alignment matrix
                     if band['name'].upper() == 'LWIR' and matrix is not None:
                         matrices_all.append(matrix)
                     # Other bands use the best alignment matrix in samples
                     else:
                         matrices_all.append({
-                            'capture_id': photo.get_capture_id(),
                             'filename': photo['filename'],
                             'warp_matrix': best_candidate['warp_matrix'],
                             'eigvals': best_candidate['eigvals'],
@@ -440,6 +438,7 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
     pyramid_levels = 0
     h,w = image_gray.shape
     min_dim = min(h, w)
+    min_dim_native = min(h, w)
 
     while min_dim > 300:
         min_dim /= 2.0
@@ -485,8 +484,9 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
                 number_of_iterations, eps)
 
         try:
-            log.ODM_INFO("Computing ECC pyramid level %s" % level)
-            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=5)
+            gaussian_filter_size = 9 if min_dim_native > 320 else 5
+            log.ODM_INFO("Computing ECC pyramid level %s using Gaussian filter size %s" % (level, gaussian_filter_size))            
+            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=gaussian_filter_size)
         except Exception as e:
             if level != pyramid_levels:
                 log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
