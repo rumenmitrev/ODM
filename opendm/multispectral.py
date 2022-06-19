@@ -284,7 +284,7 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
             def parallel_compute_homography(p):
                 try:
                     # For non thermal photos, caculate the best warp matrix using a few samples for better performance
-                    if p.is_thermal() is not True and len(matrices_samples) >= max_samples:
+                    if band['name'].upper() != 'LWIR' and len(matrices_samples) >= max_samples:
                         # log.ODM_INFO("Got enough samples for %s (%s)" % (band['name'], max_samples))
                         return
 
@@ -303,7 +303,6 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
                         matrices_samples.append({
                             'capture_id': p.get_capture_id(),
                             'filename': p['filename'],
-                            'is_thermal': p.is_thermal(),
                             'warp_matrix': warp_matrix,
                             'eigvals': np.linalg.eigvals(warp_matrix),
                             'dimension': dimension,
@@ -338,14 +337,13 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
                 for photo in band['photos']:
                     matrix = matrices_samples.get('capture_id', photo.get_capture_id())
                     # Thermal photo uses individual photo alignment matrix
-                    if photo.is_thermal() is True and matrix is not None:
+                    if band['name'].upper() == 'LWIR' and matrix is not None:
                         matrices_all.append(matrix)
                     # Other bands use the best alignment matrix in samples
                     else:
                         matrices_all.append({
                             'capture_id': photo.get_capture_id(),
                             'filename': photo['filename'],
-                            'is_thermal': best_candidate['is_thermal'],
                             'warp_matrix': best_candidate['warp_matrix'],
                             'eigvals': best_candidate['eigvals'],
                             'dimension': best_candidate['dimension'],
@@ -354,7 +352,7 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
                 alignment_info[band['name']] = matrices_all                
 
-                if best_candidate['is_thermal'] is True:
+                if band['name'].upper() == 'LWIR':
                     log.ODM_INFO("%s band will be aligned using warp matrices %s" % (band['name'], matrices_all))
                 else:
                     log.ODM_INFO("%s band will be aligned using warp matrix %s (score: %s)" % (band['name'], matrices_samples[0]['warp_matrix'], matrices_samples[0]['score']))
