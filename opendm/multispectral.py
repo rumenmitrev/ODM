@@ -333,7 +333,7 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
                 # Alignment matrices for all shots
                 matrices_all = []
-                for photo in band['photos']:
+                for photo in [{'filename': p.filename} for p in band['photos']]:
                     matrix = next((item for item in matrices_samples if item['filename'] == photo['filename']), None) # matrices_samples is a list
                     # Thermal photo uses individual photo alignment matrix
                     if band['name'].upper() == 'LWIR' and matrix is not None:
