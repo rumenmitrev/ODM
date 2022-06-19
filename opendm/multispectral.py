@@ -233,7 +233,7 @@ def compute_band_maps(multi_camera, primary_band):
                 if band['name'] != band_name:
                     p2s.setdefault(unique_id_map[uuid].filename, []).append(p)
                     
-                log.ODM_INFO("File %s <-- Capture %s" % (p.filename, uuid))    
+                # log.ODM_INFO("File %s <-- Capture %s" % (p.filename, uuid))    
 
         return s2p, p2s
     except Exception as e:
@@ -279,16 +279,16 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
     # For each secondary band
     for band in multi_camera:
         if band['name'] != primary_band_name:
-            matrices = []
+            matrices_samples = []
 
             def parallel_compute_homography(p):
                 try:
-                    if len(matrices) >= max_samples:
+                    # For non thermal photos, caculate the best warp matrix using a few samples for better performance
+                    if p.is_thermal() is not True and len(matrices_samples) >= max_samples:
                         # log.ODM_INFO("Got enough samples for %s (%s)" % (band['name'], max_samples))
                         return
 
-                    # Find good matrix candidates for alignment
-                
+                    # Find good matrix candidates for alignment                
                     primary_band_photo = s2p.get(p['filename'])
                     if primary_band_photo is None:
                         log.ODM_WARNING("Cannot find primary band photo for %s" % p['filename'])
@@ -300,7 +300,10 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
                     if warp_matrix is not None:
                         log.ODM_INFO("%s --> %s good match" % (p['filename'], primary_band_photo.filename))
 
-                        matrices.append({
+                        matrices_samples.append({
+                            'capture_id': p.get_capture_id(),
+                            'filename': p['filename'],
+                            'is_thermal': p.is_thermal(),
                             'warp_matrix': warp_matrix,
                             'eigvals': np.linalg.eigvals(warp_matrix),
                             'dimension': dimension,
@@ -315,21 +318,46 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
             # Find the matrix that has the most common eigvals
             # among all matrices. That should be the "best" alignment.
-            for m1 in matrices:
+            for m1 in matrices_samples:
                 acc = np.array([0.0,0.0,0.0])
                 e = m1['eigvals']
 
-                for m2 in matrices:
+                for m2 in matrices_samples:
                     acc += abs(e - m2['eigvals'])
 
                 m1['score'] = acc.sum()
             
             # Sort
-            matrices.sort(key=lambda x: x['score'], reverse=False)
+            matrices_samples.sort(key=lambda x: x['score'], reverse=False)                        
             
-            if len(matrices) > 0:
-                alignment_info[band['name']] = matrices[0]
-                log.ODM_INFO("%s band will be aligned using warp matrix %s (score: %s)" % (band['name'], matrices[0]['warp_matrix'], matrices[0]['score']))
+            if len(matrices_samples) > 0:
+                best_candidate = matrices_samples[0]
+
+                # Alignment matrices for all shots
+                matrices_all = []
+                for photo in band['photos']:
+                    matrix = matrices_samples.get('capture_id', photo.get_capture_id())
+                    # Thermal photo uses individual photo alignment matrix
+                    if photo.is_thermal() is True and matrix is not None:
+                        matrices_all.append(matrix)
+                    # Other bands use the best alignment matrix in samples
+                    else:
+                        matrices_all.append({
+                            'capture_id': photo.get_capture_id(),
+                            'filename': photo['filename'],
+                            'is_thermal': best_candidate['is_thermal'],
+                            'warp_matrix': best_candidate['warp_matrix'],
+                            'eigvals': best_candidate['eigvals'],
+                            'dimension': best_candidate['dimension'],
+                            'algo': best_candidate['algo']
+                        })
+
+                alignment_info[band['name']] = matrices_all                
+
+                if best_candidate['is_thermal'] is True:
+                    log.ODM_INFO("%s band will be aligned using warp matrices %s" % (band['name'], matrices_all))
+                else:
+                    log.ODM_INFO("%s band will be aligned using warp matrix %s (score: %s)" % (band['name'], matrices_samples[0]['warp_matrix'], matrices_samples[0]['score']))
             else:
                 log.ODM_WARNING("Cannot find alignment matrix for band %s, The band might end up misaligned!" % band['name'])
 
@@ -410,7 +438,7 @@ def compute_homography(image_filename, align_image_filename):
         log.ODM_WARNING("Compute homography: %s" % str(e))
         return None, (None, None), None
 
-def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=2500, termination_eps=1e-9, start_eps=1e-4):
+def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000, termination_eps=1e-8, start_eps=1e-4):
     pyramid_levels = 0
     h,w = image_gray.shape
     min_dim = min(h, w)
@@ -459,18 +487,15 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=2500,
                 number_of_iterations, eps)
 
         try:
-            log.ODM_INFO("Computing ECC pyramid level %s with Gauss filter size 1" % level)
-            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=1)
-        except TypeError:
-            try: # Fallback to default gaussFilterSize=5
-                log.ODM_INFO("Computing ECC pyramid level %s with Gauss filter size 5" % level)
-                _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria)
-            except Exception as e:
-                if level != pyramid_levels:
-                    log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
-                    warp_matrix = np.eye(3, 3, dtype=np.float32)
-                else:
-                    raise e
+            log.ODM_INFO("Computing ECC pyramid level %s" % level)
+            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=5)
+        except Exception as e:
+            if level != pyramid_levels:
+                log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
+                warp_matrix = np.eye(3, 3, dtype=np.float32)
+            else:
+                raise e
+            
 
         if level != pyramid_levels: 
             warp_matrix = warp_matrix * np.array([[1,1,2],[1,1,2],[0.5,0.5,1]], dtype=np.float32)
