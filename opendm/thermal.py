@@ -14,7 +14,8 @@ def resize_to_match(image, match_photo = None):
         if w != match_photo.width or h != match_photo.height:
             image = cv2.resize(image, None, 
                     fx=match_photo.width/w, 
-                    fy=match_photo.height/h)
+                    fy=match_photo.height/h,
+                    interpolation=cv2.INTER_LANCZOS4)
     return image
 
 def dn_to_temperature(photo, image, dataset_tree):
