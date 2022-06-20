@@ -484,7 +484,7 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
                 number_of_iterations, eps)
 
         try:
-            gaussian_filter_size = 9 if min_dim_native > 320 else 5
+            gaussian_filter_size = 9 if min_dim_native > 80 else 5
             log.ODM_INFO("Computing ECC pyramid level %s using Gaussian filter size %s" % (level, gaussian_filter_size))            
             _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=gaussian_filter_size)
         except Exception as e:
