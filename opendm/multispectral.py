@@ -53,9 +53,9 @@ def dn_to_radiance(photo, image):
         image -= dark_level
 
     # Normalize DN to 0 - 1.0
-    # bit_depth_max = photo.get_bit_depth_max()
-    # if bit_depth_max:
-    #    image /= bit_depth_max
+    bit_depth_max = photo.get_bit_depth_max()
+    if bit_depth_max:
+        image /= bit_depth_max
 
     if V is not None:
         # vignette correction
@@ -409,7 +409,7 @@ def compute_homography(image_filename, align_image_filename):
         dimension = None
         algo = None
 
-        if max_dim > 320:
+        if max_dim > 80: # Try feature based approach first
             algo = 'feat'
             result = compute_using(find_features_homography)
             
@@ -484,7 +484,7 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
                 number_of_iterations, eps)
 
         try:
-            gaussian_filter_size = 9 if min_dim_native > 320 else 5
+            gaussian_filter_size = 9 if min_dim_native > 80 else 5
             log.ODM_INFO("Computing ECC pyramid level %s using Gaussian filter size %s" % (level, gaussian_filter_size))            
             _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=gaussian_filter_size)
         except Exception as e:

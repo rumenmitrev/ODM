@@ -14,7 +14,8 @@ def resize_to_match(image, match_photo = None):
         if w != match_photo.width or h != match_photo.height:
             image = cv2.resize(image, None, 
                     fx=match_photo.width/w, 
-                    fy=match_photo.height/h)
+                    fy=match_photo.height/h,
+                    interpolation=cv2.INTER_LANCZOS4)
     return image
 
 def dn_to_temperature(photo, image, dataset_tree):
@@ -35,8 +36,8 @@ def dn_to_temperature(photo, image, dataset_tree):
         # but not necessarily for others
         if photo.camera_make == "MicaSense" and photo.camera_model == "Altum":
             image = image.astype("float32")
-            #image -= (273.15 * 100.0) # Convert Kelvin to Celsius
-            #image *= 0.01
+            image -= (273.15 * 100.0) # Convert Kelvin to Celsius
+            image *= 0.01
             return image
         elif photo.camera_make == "DJI" and photo.camera_model == "MAVIC2-ENTERPRISE-ADVANCED":
             image = dji_unpack.extract_temperatures_dji(photo, image, dataset_tree)
