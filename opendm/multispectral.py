@@ -274,6 +274,8 @@ def compute_band_maps(multi_camera, primary_band):
 def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p, p2s, max_concurrency=1, max_samples=30):
     log.ODM_INFO("Computing band alignment")
 
+    use_local_warp_matrix = False
+
     alignment_info = {}
 
     # For each secondary band
@@ -283,8 +285,8 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
             def parallel_compute_homography(p):
                 try:
-                    # For non thermal photos, caculate the best warp matrix using a few samples for better performance
-                    if band['name'].upper() != 'LWIR' and len(matrices_samples) >= max_samples:
+                    # Caculate the best warp matrix using a few samples in favor of performance
+                    if use_local_warp_matrix is not True and len(matrices_samples) >= max_samples:
                         # log.ODM_INFO("Got enough samples for %s (%s)" % (band['name'], max_samples))
                         return
 
@@ -333,12 +335,12 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
                 # Alignment matrices for all shots
                 matrices_all = []
+                
                 for photo in [{'filename': p.filename} for p in band['photos']]:
-                    matrix = next((item for item in matrices_samples if item['filename'] == photo['filename']), None) # matrices_samples is a list
-                    # Thermal photo uses individual photo alignment matrix
-                    if band['name'].upper() == 'LWIR' and matrix is not None:
-                        matrices_all.append(matrix)
-                    # Other bands use the best alignment matrix in samples
+                    local_warp_matrix = next((item for item in matrices_samples if item['filename'] == photo['filename']), None) # matrices_samples is a list
+
+                    if use_local_warp_matrix and local_warp_matrix is not None:
+                        matrices_all.append(local_warp_matrix)
                     else:
                         matrices_all.append({
                             'filename': photo['filename'],
@@ -350,10 +352,10 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
                 alignment_info[band['name']] = matrices_all                
 
-                if band['name'].upper() == 'LWIR':
-                    log.ODM_INFO("%s band will be aligned using warp matrices %s" % (band['name'], matrices_all))
+                if use_local_warp_matrix:
+                    log.ODM_INFO("%s band will be aligned using local warp matrices %s" % (band['name'], matrices_all))
                 else:
-                    log.ODM_INFO("%s band will be aligned using warp matrix %s (score: %s)" % (band['name'], matrices_samples[0]['warp_matrix'], matrices_samples[0]['score']))
+                    log.ODM_INFO("%s band will be aligned using global warp matrix %s (score: %s)" % (band['name'], best_candidate['warp_matrix'], best_candidate['score']))
             else:
                 log.ODM_WARNING("Cannot find alignment matrix for band %s, The band might end up misaligned!" % band['name'])
 
@@ -409,7 +411,7 @@ def compute_homography(image_filename, align_image_filename):
         dimension = None
         algo = None
 
-        if max_dim > 80: # Try feature based approach first
+        if max_dim > 320: # Try feature based approach first
             algo = 'feat'
             result = compute_using(find_features_homography)
             
@@ -422,7 +424,7 @@ def compute_homography(image_filename, align_image_filename):
 
         else: # ECC only for low resolution images
             algo = 'ecc'
-            log.ODM_INFO("Using ECC (this might take a bit)")
+            log.ODM_INFO("Skip features matching due to low resolution, will use ECC (this might take a bit)")
             result = compute_using(find_ecc_homography)
             if result[0] is None:
                 algo = None
@@ -467,8 +469,9 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
         align_image_pyr.insert(0, cv2.resize(align_image_pyr[0], None, fx=1/2, fy=1/2,
                                 interpolation=cv2.INTER_AREA))
 
-    # Define the motion model
+    # Define the motion model, scale the initial warp matrix to smallest level
     warp_matrix = np.eye(3, 3, dtype=np.float32)
+    warp_matrix = warp_matrix * np.array([[1,1,2],[1,1,2],[0.5,0.5,1]], dtype=np.float32)**(1-(pyramid_levels+1))
 
     for level in range(pyramid_levels+1):
         ig = gradient(gaussian(image_gray_pyr[level]))
@@ -484,13 +487,14 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
                 number_of_iterations, eps)
 
         try:
-            gaussian_filter_size = 9 if min_dim_native > 80 else 5
+            gaussian_filter_size = 9 if min_dim_native > 320 else 5
             log.ODM_INFO("Computing ECC pyramid level %s using Gaussian filter size %s" % (level, gaussian_filter_size))            
             _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=gaussian_filter_size)
         except Exception as e:
             if level != pyramid_levels:
                 log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
                 warp_matrix = np.eye(3, 3, dtype=np.float32)
+                warp_matrix = warp_matrix * np.array([[1,1,2],[1,1,2],[0.5,0.5,1]], dtype=np.float32)**(1-(pyramid_levels+1))
             else:
                 raise e
             
