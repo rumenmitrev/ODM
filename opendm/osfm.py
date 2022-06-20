@@ -50,8 +50,6 @@ class OSFMContext:
             log.ODM_WARNING('Found a valid OpenSfM tracks file in: %s' % tracks_file)
 
     def reconstruct(self, rolling_shutter_correct=False, rerun=False):
-        # TODO: FIX calls from split-merge
-
         reconstruction_file = os.path.join(self.opensfm_project_path, 'reconstruction.json')
         if not io.file_exists(reconstruction_file) or rerun:
             self.run('reconstruct')
@@ -235,7 +233,7 @@ class OSFMContext:
                 "matching_gps_neighbors: %s" % matcher_neighbors,
                 "matching_gps_distance: 0",
                 "matching_graph_rounds: %s" % matcher_graph_rounds,
-                "optimize_camera_parameters: %s" % ('no' if args.use_fixed_camera_params or args.cameras else 'yes'),
+                "optimize_camera_parameters: %s" % ('no' if args.use_fixed_camera_params else 'yes'),
                 "reconstruction_algorithm: %s" % (args.sfm_algorithm),
                 "undistorted_image_format: tif",
                 "bundle_outlier_filtering_type: AUTO",
