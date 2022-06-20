@@ -53,9 +53,9 @@ def dn_to_radiance(photo, image):
         image -= dark_level
 
     # Normalize DN to 0 - 1.0
-    # bit_depth_max = photo.get_bit_depth_max()
-    # if bit_depth_max:
-    #    image /= bit_depth_max
+    bit_depth_max = photo.get_bit_depth_max()
+    if bit_depth_max:
+        image /= bit_depth_max
 
     if V is not None:
         # vignette correction
