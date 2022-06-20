@@ -274,6 +274,8 @@ def compute_band_maps(multi_camera, primary_band):
 def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p, p2s, max_concurrency=1, max_samples=30):
     log.ODM_INFO("Computing band alignment")
 
+    use_local_warp_matrix = False
+
     alignment_info = {}
 
     # For each secondary band
@@ -283,8 +285,8 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
             def parallel_compute_homography(p):
                 try:
-                    # For non thermal photos, caculate the best warp matrix using a few samples for better performance
-                    if band['name'].upper() != 'LWIR' and len(matrices_samples) >= max_samples:
+                    # Caculate the best warp matrix using a few samples in favor of performance
+                    if use_local_warp_matrix is not True and len(matrices_samples) >= max_samples:
                         # log.ODM_INFO("Got enough samples for %s (%s)" % (band['name'], max_samples))
                         return
 
@@ -333,12 +335,12 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
                 # Alignment matrices for all shots
                 matrices_all = []
+                
                 for photo in [{'filename': p.filename} for p in band['photos']]:
-                    matrix = next((item for item in matrices_samples if item['filename'] == photo['filename']), None) # matrices_samples is a list
-                    # Thermal photo uses individual photo alignment matrix
-                    if band['name'].upper() == 'LWIR' and matrix is not None:
-                        matrices_all.append(matrix)
-                    # Other bands use the best alignment matrix in samples
+                    local_warp_matrix = next((item for item in matrices_samples if item['filename'] == photo['filename']), None) # matrices_samples is a list
+
+                    if use_local_warp_matrix and local_warp_matrix is not None:
+                        matrices_all.append(local_warp_matrix)
                     else:
                         matrices_all.append({
                             'filename': photo['filename'],
@@ -350,10 +352,10 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
                 alignment_info[band['name']] = matrices_all                
 
-                if band['name'].upper() == 'LWIR':
-                    log.ODM_INFO("%s band will be aligned using warp matrices %s" % (band['name'], matrices_all))
+                if use_local_warp_matrix:
+                    log.ODM_INFO("%s band will be aligned using local warp matrices %s" % (band['name'], matrices_all))
                 else:
-                    log.ODM_INFO("%s band will be aligned using warp matrix %s (score: %s)" % (band['name'], matrices_samples[0]['warp_matrix'], matrices_samples[0]['score']))
+                    log.ODM_INFO("%s band will be aligned using global warp matrix %s (score: %s)" % (band['name'], best_candidate['warp_matrix'], best_candidate['score']))
             else:
                 log.ODM_WARNING("Cannot find alignment matrix for band %s, The band might end up misaligned!" % band['name'])
 
