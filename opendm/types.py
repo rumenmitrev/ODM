@@ -323,7 +323,8 @@ class ODM_Stage:
         start_time = system.now_raw()
         log.logger.log_json_stage_run(self.name, start_time)
 
-        log.ODM_INFO('Running %s stage' % self.name)
+        # log.ODM_INFO('Running %s stage' % self.name)                                                                      # PS--
+        log.ODM_INFO('ET_started   {}                  {}'.format(start_time, self.name))                                   # PS++
         
         self.process(self.args, outputs)
 
@@ -334,7 +335,10 @@ class ODM_Stage:
         if self.args.time:
             system.benchmark(start_time, outputs['tree'].benchmarking, self.name)
 
-        log.ODM_INFO('Finished %s stage' % self.name)
+        # log.ODM_INFO('Finished %s stage' % self.name)                                                                     # PS--
+        current_time = system.now_raw()                                                                                     # PS++
+        elapsed_time = current_time - start_time                                                                            # PS++
+        log.ODM_INFO('ET_finished  {}  {}  {}'.format(current_time, elapsed_time, self.name))                               # PS++
         self.update_progress_end()
 
         # Last stage?
