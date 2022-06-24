@@ -69,6 +69,8 @@ def run(cmd, env_paths=[context.superbuild_bin_path], env_vars={}, packages_path
     """Run a system command"""
     global running_subprocesses
 
+    start_time = now_raw()                                                                                                  # PS++
+    log.ODM_INFO('ET_startedX  {}                                  {}'.format(start_time, cmd[:75]))                        # PS++
     log.ODM_INFO('running %s' % cmd)
     env = os.environ.copy()
 
@@ -104,6 +106,9 @@ def run(cmd, env_paths=[context.superbuild_bin_path], env_vars={}, packages_path
         raise SubprocessException("Child was terminated by signal {}".format(-retcode), -retcode)
     elif retcode > 0:
         raise SubprocessException("Child returned {}".format(retcode), retcode)
+    current_time = now_raw()                                                                                                # PS++
+    elapsed_time = current_time - start_time                                                                                # PS++
+    log.ODM_INFO('ET_finishedX {}                  {}  {}'.format(current_time, elapsed_time, cmd[:75]))                    # PS++
 
 
 def now():
