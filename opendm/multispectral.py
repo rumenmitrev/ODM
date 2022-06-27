@@ -411,7 +411,7 @@ def compute_homography(image_filename, align_image_filename):
         dimension = None
         algo = None
 
-        if max_dim > 320: # Try feature based approach first
+        if max_dim >= 160: # Try feature based approach first
             algo = 'feat'
             result = compute_using(find_features_homography)
             
@@ -505,8 +505,7 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
     return warp_matrix
 
 
-def find_features_homography(image_gray, align_image_gray, feature_retention=0.7):
-    min_match_count = 10
+def find_features_homography(image_gray, align_image_gray, feature_retention=0.7, min_match_count = 4):
 
     # Detect SIFT features and compute descriptors.
     detector = cv2.SIFT_create(edgeThreshold=10, contrastThreshold=0.1)
