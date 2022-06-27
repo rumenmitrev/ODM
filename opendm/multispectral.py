@@ -450,12 +450,15 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
     
     # Quick check on size
     if align_image_gray.shape[0] != image_gray.shape[0]:
+        interpolation_mode = cv2.INTER_AREA # for downscaling
+        if image_gray.shape[1] < align_image_gray.shape[1] and image_gray.shape[0] < align_image_gray.shape[0]:
+            interpolation_mode = cv2.INTER_LANCZOS4 # for upscaling
         align_image_gray = to_8bit(align_image_gray)
         image_gray = to_8bit(image_gray)
         image_gray = cv2.resize(image_gray, None, 
                         fx=align_image_gray.shape[1]/image_gray.shape[1], 
                         fy=align_image_gray.shape[0]/image_gray.shape[0],
-                        interpolation=cv2.INTER_AREA)
+                        interpolation=interpolation_mode)
 
     # Build pyramids
     image_gray_pyr = [image_gray]
