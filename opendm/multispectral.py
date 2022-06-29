@@ -507,7 +507,7 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
     return warp_matrix
 
 
-def find_features_homography(image_gray, align_image_gray, feature_retention=0.7, min_match_count=4):
+def find_features_homography(image_gray, align_image_gray, feature_retention=0.7, min_match_count=10):
     # Quick check on size
     if align_image_gray.shape[0] != image_gray.shape[0]:
         interpolation_mode = cv2.INTER_AREA # for downscaling
