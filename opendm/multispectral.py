@@ -411,7 +411,7 @@ def compute_homography(image_filename, align_image_filename):
         dimension = None
         algo = None
 
-        if max_dim >= 160: # Try feature based approach first
+        if max_dim > 320: # Try feature based approach first
             algo = 'feat'
             result = compute_using(find_features_homography)
             
