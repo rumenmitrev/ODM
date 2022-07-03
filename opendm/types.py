@@ -296,6 +296,15 @@ class ODM_Tree(object):
 
 
 class ODM_Stage:
+    ######################################################################################################################### WC++ Wall Clock
+    WC_job0 = None          # job   : start time                                                                            # WC++
+    WC_stage = None         # stage : name                                                                                  # WC++
+    WC_stage0 = None        # stage : start time                                                                            # WC++
+    WC_stage1 = None        # stage : stop  time                                                                            # WC++
+    WC_step0 = None         # step  : start time                                                                            # WC++
+    WC_step1 = None         # step  : stop  time                                                                            # WC++
+                                                                                                                            # WC++
+    ######################################################################################################################### WC++
     def __init__(self, name, args, progress=0.0, **params):
         self.name = name
         self.args = args
@@ -305,6 +314,12 @@ class ODM_Stage:
             self.params = {}
         self.next_stage = None
         self.prev_stage = None
+        ##################################################################################################################### WC++
+        ODM_Stage.WC_job0 = system.now_raw().replace(microsecond = 0)                                                       # WC++
+        ODM_Stage.WC_stage0 = ODM_Stage.WC_job0                                                                             # WC++
+        ODM_Stage.WC_step0  = ODM_Stage.WC_job0                                                                             # WC++
+                                                                                                                            # WC++
+        ##################################################################################################################### WC++
 
     def connect(self, stage):
         self.next_stage = stage
@@ -323,8 +338,21 @@ class ODM_Stage:
         start_time = system.now_raw()
         log.logger.log_json_stage_run(self.name, start_time)
 
-        # log.ODM_INFO('Running %s stage' % self.name)                                                                      # PS--
-        log.ODM_INFO('ET_started   {}                  {}'.format(start_time, self.name))                                   # PS++
+        ##################################################################################################################### WC++
+        # log.ODM_INFO('Running %s stage' % self.name)                                                                      # WC--
+        ODM_Stage.WC_stage = self.name                                                                                      # WC++
+        ODM_Stage.WC_stage1 = start_time.replace(microsecond = 0)                                                           # WC++
+        timedelta_stage = ODM_Stage.WC_stage1 - ODM_Stage.WC_stage0                                                         # WC++
+        if timedelta_stage.total_seconds() < 5:                                                     # Logging threshold     # WC++
+            log.ODM_INFO('##### {}  stage=-------                WC_start  ({})'.format(                                    # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, ODM_Stage.WC_stage))                                           # WC++
+        else:                                                                                                               # WC++
+            log.ODM_INFO('##### {}  stage={}                WC_START  ({})'.format(                                         # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, timedelta_stage, ODM_Stage.WC_stage))                          # WC++
+        ODM_Stage.WC_stage0 = ODM_Stage.WC_stage1                                                                           # WC++
+        ODM_Stage.WC_step0  = ODM_Stage.WC_stage1                                                                           # WC++
+                                                                                                                            # WC++
+        ##################################################################################################################### WC++
         
         self.process(self.args, outputs)
 
@@ -335,10 +363,20 @@ class ODM_Stage:
         if self.args.time:
             system.benchmark(start_time, outputs['tree'].benchmarking, self.name)
 
-        # log.ODM_INFO('Finished %s stage' % self.name)                                                                     # PS--
-        current_time = system.now_raw()                                                                                     # PS++
-        elapsed_time = current_time - start_time                                                                            # PS++
-        log.ODM_INFO('ET_finished  {}  {}  {}'.format(current_time, elapsed_time, self.name))                               # PS++
+        ##################################################################################################################### WC++
+        # log.ODM_INFO('Finished %s stage' % self.name)                                                                     # WC--
+        ODM_Stage.WC_stage1 = system.now_raw().replace(microsecond = 0)                                                     # WC++
+        timedelta_stage = ODM_Stage.WC_stage1 - ODM_Stage.WC_stage0                                                         # WC++
+        if timedelta_stage.total_seconds() < 5:                                                     # Logging threshold     # WC++
+            log.ODM_INFO('##### {}  stage=-------                WC_fin     {}'.format(                                     # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, ODM_Stage.WC_stage))                                           # WC++
+        else:                                                                                                               # WC++
+            log.ODM_INFO('##### {}  stage={}                WC_FIN     {}'.format(                                          # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, timedelta_stage, ODM_Stage.WC_stage))                          # WC++
+        ODM_Stage.WC_stage0 = ODM_Stage.WC_stage1                                                                           # WC++
+        ODM_Stage.WC_step0  = ODM_Stage.WC_stage1                                                                           # WC++
+                                                                                                                            # WC++
+        ##################################################################################################################### WC++
         self.update_progress_end()
 
         # Last stage?

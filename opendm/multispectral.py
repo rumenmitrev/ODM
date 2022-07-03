@@ -36,28 +36,39 @@ def dn_to_radiance(photo, image):
     if photo.camera_make == 'Parrot' and photo.camera_model == 'Sequoia':                                                   # Cam(Seq)++
         # #### dark #######################################                                                                 # Cam(Seq)++
         if photo.band_name == 'Green':                                                                                      # Cam(Seq)++
-            dark = 4760.0                                                       # 4760                                      # Cam(Seq)++    # Param
+            dark = 4760.0                                                               # 4760                              # Cam(Seq)++    # Param
         elif photo.band_name == 'Red':                                                                                      # Cam(Seq)++
-            dark = 4810.0                                                       # 4810                                      # Cam(Seq)++    # Param
+            dark = 4810.0                                                               # 4810                              # Cam(Seq)++    # Param
         elif photo.band_name == 'Rededge' or photo.band_name == 'RedEdge':                                                  # Cam(Seq)++
-            dark = 4750.0                                                       # 4750                                      # Cam(Seq)++    # Param
+            dark = 4750.0                                                               # 4750                              # Cam(Seq)++    # Param
         elif photo.band_name == 'NIR':                                                                                      # Cam(Seq)++
-            dark = 4820.0                                                       # 4820                                      # Cam(Seq)++    # Param
+            dark = 4820.0                                                               # 4820                              # Cam(Seq)++    # Param
                                                                                                                             # Cam(Seq)++
         # #### exposure_time [ms] #########################                                                                 # Cam(Seq)++
         if photo.exposure_time is not None:                                                                                 # Cam(Seq)++
             if photo.band_name == 'Green':                                                                                  # Cam(Seq)++
-                exposure_msec = (photo.exposure_time + 0.000135) * 1000.0       # 135                                       # Cam(Seq)++    # Param
+                exposure_msec = (photo.exposure_time + 0.000135) * 1000.0               # 135                               # Cam(Seq)++    # Param
             elif photo.band_name == 'Red':                                                                                  # Cam(Seq)++
-                exposure_msec = (photo.exposure_time + 0.000118) * 1000.0       # 118                                       # Cam(Seq)++    # Param
+                exposure_msec = (photo.exposure_time + 0.000118) * 1000.0               # 118                               # Cam(Seq)++    # Param
             elif photo.band_name == 'Rededge' or photo.band_name == 'RedEdge':                                              # Cam(Seq)++
-                exposure_msec = (photo.exposure_time + 0.000116) * 1000.0       # 116                                       # Cam(Seq)++    # Param
+                exposure_msec = (photo.exposure_time + 0.000116) * 1000.0               # 116                               # Cam(Seq)++    # Param
             elif photo.band_name == 'NIR':                                                                                  # Cam(Seq)++
-                exposure_msec = (photo.exposure_time + 0.000110) * 1000.0       # 110                                       # Cam(Seq)++    # Param
+                exposure_msec = (photo.exposure_time + 0.000110) * 1000.0               # 110                               # Cam(Seq)++    # Param
                                                                                                                             # Cam(Seq)++
         # #### gain #######################################                                                                 # Cam(Seq)++
-        if photo.iso_speed is not None:                                                                                     # Cam(Seq)++
-            gain = photo.iso_speed / 100.0                                                                                  # Cam(Seq)++
+        if photo.iso_speed is not None and photo.seq_sensor_model is not None:                                              # Cam(Seq)++
+            sensor_pm = np.array([float(v) for v in photo.seq_sensor_model.split(",")])                                     # Cam(Seq)++
+            gain = (photo.iso_speed / 100.0) * (sensor_pm[0] / 6125.0)                  # 6125                              # Cam(Seq)++    # Param
+                                # sensor_pm[0];1st. parameter of sensor model                                               # Cam(Seq)++
+                                # The denominator value is determined to be the appropriate sensitivity to green light      # Cam(Seq)++
+            if photo.band_name == 'Green':                                                                                  # Cam(Seq)++
+                gain *= 1.0000                                                                                              # Cam(Seq)++
+            elif photo.band_name == 'Red':                                                                                  # Cam(Seq)++
+                gain *= 0.9720                                                          # 9720                              # Cam(Seq)++    # Param
+            elif photo.band_name == 'Rededge' or photo.band_name == 'RedEdge':                                              # Cam(Seq)++
+                gain *= 0.6980                                                          # 6980                              # Cam(Seq)++    # Param
+            elif photo.band_name == 'NIR':                                                                                  # Cam(Seq)++
+                gain *= 0.5290                                                          # 5290                              # Cam(Seq)++    # Param
                                                                                                                             # Cam(Seq)++
         # #################################################                                                                 # Cam(Seq)++
         if dark is None or photo.fnumber is None or exposure_msec is None or gain is None:                                  # Cam(Seq)++
@@ -69,7 +80,7 @@ def dn_to_radiance(photo, image):
                                                                                                                             # Cam(Seq)++
         log.ODM_DEBUG("MulD,  {},  (*= fn*fn/ExposMSec/gain),  {},  {},  {},  total,  {},".format(                          # Cam(Seq)++
                 photo.filename, photo.fnumber, exposure_msec, gain, photo.fnumber * photo.fnumber / exposure_msec / gain))  # Cam(Seq)++
-        return image * photo.fnumber * photo.fnumber / exposure_msec / gain                                                 # Cam(Seq)++                                                                                                        # Cam(Seq)++
+        return image * photo.fnumber * photo.fnumber / exposure_msec / gain                                                 # Cam(Seq)++
                                                                                                                             # Cam(Seq)++
     ######################################################################################################################### Cam(P4M)++
     if photo.camera_make == 'DJI' and photo.camera_model == 'FC6360':                                                       # Cam(P4M)++
@@ -77,8 +88,22 @@ def dn_to_radiance(photo, image):
         if photo.exposure_time is not None:                                                                                 # Cam(P4M)++
             exposure_msec = photo.exposure_time * 1000.0                                                                    # Cam(P4M)++
                                                                                                                             # Cam(P4M)++
-        # #################################################                                                                 # Cam(Seq)++
-        if photo.p4m_dark is None or photo.fnumber is None or exposure_msec is None or photo.p4m_gain is None:              # Cam(P4M)++
+        # #### gain #######################################                                                                 # Cam(P4M)++
+        if  photo.p4m_gain is not None and photo.p4m_gain_adj is not None:                                                  # Cam(P4M)++
+            gain = photo.p4m_gain / photo.p4m_gain_adj                                                                      # Cam(P4M)++
+            if photo.band_name == 'Blue':                                                                                   # Cam(P4M)++
+                gain *= 10.1                                                            #                                   # Cam(P4M)++    # Param
+            elif photo.band_name == 'Green':                                                                                # Cam(P4M)++
+                gain *= 15.4                                                            #                                   # Cam(P4M)++    # Param
+            elif photo.band_name == 'Red':                                                                                  # Cam(P4M)++
+                gain *= 13.6                                                            #                                   # Cam(P4M)++    # Param
+            elif photo.band_name == 'Rededge' or photo.band_name == 'RedEdge':                                              # Cam(P4M)++
+                gain *= 9.79                                                            #                                   # Cam(P4M)++    # Param
+            elif photo.band_name == 'NIR':                                                                                  # Cam(P4M)++
+                gain *= 9.00                                                            # 10.6                              # Cam(P4M)++    # Param
+                                                                                                                            # Cam(P4M)++
+        # #################################################                                                                 # Cam(P4M)++
+        if photo.p4m_dark is None or photo.fnumber is None or exposure_msec is None or gain is None:                        # Cam(P4M)++
             log.ODM_ERROR("Error {} Invalid_EXIF_tags".format(photo.filename))                                              # Cam(P4M)++
             raise RuntimeError("Invalid EXIF tags.")                                                                        # Cam(P4M)++
                                                                                                                             # Cam(P4M)++
@@ -95,9 +120,8 @@ def dn_to_radiance(photo, image):
             log.ODM_DEBUG("MulC,  {},  VignetCorr".format(photo.filename))                                                  # Cam(P4M)++
                                                                                                                             # Cam(P4M)++
         log.ODM_DEBUG("MulD,  {},  (*= fn*fn/ExposMSec/gain),  {},  {},  {},  total,  {},".format(                          # Cam(P4M)++
-                photo.filename, photo.fnumber, exposure_msec, photo.p4m_gain,                                               # Cam(P4M)++
-                photo.fnumber * photo.fnumber / exposure_msec / photo.p4m_gain))                                            # Cam(P4M)++
-        return image * photo.fnumber * photo.fnumber / exposure_msec / photo.p4m_gain                                       # Cam(P4M)++
+                photo.filename, photo.fnumber, exposure_msec, gain, photo.fnumber * photo.fnumber / exposure_msec / gain))  # Cam(P4M)++
+        return image * photo.fnumber * photo.fnumber / exposure_msec / gain                                                 # Cam(P4M)++
                                                                                                                             # Cam(P4M)++
     ######################################################################################################################### Cam(P4M)++
     # All others
@@ -193,48 +217,35 @@ def dn_to_reflectance(photo, image, use_sun_sensor=True):
                                                                                                                             # DLS++
     ######################################################################################################################### DLS(Seq)++
     if photo.camera_make == 'Parrot' and photo.camera_model == 'Sequoia':                                                   # DLS(Seq)++
-        if photo.seq_sensor_model is None:                                                                                  # DLS(Seq)++
-            log.ODM_ERROR("Error {} Invalid_EXIF_tags".format(photo.filename))                                              # DLS(Seq)++
-            raise RuntimeError("Invalid EXIF tags.")                                                                        # DLS(Seq)++
-                                                                                                                            # DLS(Seq)++
-        sensor_pm = np.array([float(v) for v in photo.seq_sensor_model.split(",")])                                         # DLS(Seq)++
-        a1 = 1.0 / (sensor_pm[0] / 65536.0)             # sensor_pm[0];1st. parameter of sensor model                       # DLS(Seq)++
-                                                                                                                            # DLS(Seq)++
         if photo.band_name == 'Green':                                                                                      # DLS(Seq)++
-            fac = 4.85                                                          # 485                                       # DLS(Seq)++    # Param
+            irrad_typical = 51.9                                                        #                                   # DLS(Seq)++    # Param
         elif photo.band_name == 'Red':                                                                                      # DLS(Seq)++
-            fac = 2.98                                                          # 298                                       # DLS(Seq)++    # Param
+            irrad_typical = 31.0                                                        #                                   # DLS(Seq)++    # Param
         elif photo.band_name == 'Rededge' or photo.band_name == 'RedEdge':                                                  # DLS(Seq)++
-            fac = 2.70                                                          # 270                                       # DLS(Seq)++    # Param
+            irrad_typical = 22.3                                                        #                                   # DLS(Seq)++    # Param
         elif photo.band_name == 'NIR':                                                                                      # DLS(Seq)++
-            fac = 3.69                                                          # 369                                       # DLS(Seq)++    # Param
+            irrad_typical = 20.9                                                        #                                   # DLS(Seq)++    # Param
                                                                                                                             # DLS(Seq)++
-        log.ODM_DEBUG("MulX,  {},  camera+sun (/= (irrad/a1) *fac),  {},  {},  {},  total,  {},".format(                    # DLS(Seq)++
-                photo.filename, irrad, a1, fac, 1.0 / ( irrad / a1 ) * fac ))                                               # DLS(Seq)++
-        return radiance / (irrad / a1) * fac                                                                                # DLS(Seq)++
+        log.ODM_DEBUG("MulX,  {},  camera+sun (/= (irrad/irrad_typical)),  {},  {},  rate,  {},".format(                    # DLS(Seq)++
+                photo.filename, irrad, irrad_typical, irrad / irrad_typical))                                               # DLS(Seq)++
+        return radiance / (irrad / irrad_typical)                                                                           # DLS(Seq)++
                                                                                                                             # DLS(Seq)++
     ######################################################################################################################### DLS(P4M)++
     if photo.camera_make == 'DJI' and photo.camera_model == 'FC6360':                                                       # DLS(P4M)++
-        if photo.p4m_gain_adj is None:                                                                                      # DLS(P4M)++
-            log.ODM_ERROR("Error {} Invalid_EXIF_tags".format(photo.filename))                                              # DLS(P4M)++
-            raise RuntimeError("Invalid EXIF tags.")                                                                        # DLS(P4M)++
-                                                                                                                            # DLS(P4M)++
-        irrad /= 65536.0                                                        # normalize                                 # DLS(P4M)++
-                                                                                                                            # DLS(P4M)++
         if photo.band_name == 'Blue':                                                                                       # DLS(P4M)++
-            fac = 0.014                                                                                                     # DLS(P4M)++    # Param
+            irrad_typical = 12400.0                                                     #                                   # DLS(P4M)++    # Param
         elif photo.band_name == 'Green':                                                                                    # DLS(P4M)++
-            fac = 0.014                                                                                                     # DLS(P4M)++    # Param
+            irrad_typical = 12600.0                                                     #                                   # DLS(P4M)++    # Param
         elif photo.band_name == 'Red':                                                                                      # DLS(P4M)++
-            fac = 0.014                                                                                                     # DLS(P4M)++    # Param
+            irrad_typical = 11100.0                                                     #                                   # DLS(P4M)++    # Param
         elif photo.band_name == 'Rededge' or photo.band_name == 'RedEdge':                                                  # DLS(P4M)++
-            fac = 0.014                                                                                                     # DLS(P4M)++    # Param
+            irrad_typical = 8020.0                                                      #                                   # DLS(P4M)++    # Param
         elif photo.band_name == 'NIR':                                                                                      # DLS(P4M)++
-            fac = 0.014                                                                                                     # DLS(P4M)++    # Param
+            irrad_typical = 7810.0                                                      #                                   # DLS(P4M)++    # Param
                                                                                                                             # DLS(P4M)++
-        log.ODM_DEBUG("MulX,  {},  camera+sun (/= (irrad/gain_adj) *fac),  {},  {},  {},  total,  {},".format(              # DLS(P4M)++
-                photo.filename, irrad, photo.p4m_gain_adj, fac, 1.0 / ( irrad / photo.p4m_gain_adj ) * fac ))               # DLS(P4M)++
-        return radiance / ( irrad / photo.p4m_gain_adj ) * fac                                                              # DLS(P4M)++
+        log.ODM_DEBUG("MulX,  {},  camera+sun (/= (irrad/irrad_typical)),  {},  {},  rate,  {},".format(                    # DLS(P4M)++
+                photo.filename, irrad, irrad_typical, irrad / irrad_typical))                                               # DLS(P4M)++
+        return radiance / (irrad / irrad_typical)                                                                           # DLS(P4M)++
                                                                                                                             # DLS(P4M)++
     ######################################################################################################################### DLS(P4M)++
     irradiance = compute_irradiance(photo, use_sun_sensor=use_sun_sensor)
