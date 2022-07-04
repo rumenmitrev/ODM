@@ -171,7 +171,7 @@ def feather_raster(input_raster, output_raster, blend_distance=20):
             else:
                 log.ODM_WARNING("%s does not have an alpha band, cannot feather raster!" % input_raster)
 
-        with rasterio.open(output_raster, 'w', **rast.profile) as dst:
+        with rasterio.open(output_raster, 'w', BIGTIFF="IF_SAFER", **rast.profile) as dst:
             dst.colorinterp = rast.colorinterp
             dst.write(out_image)
 
@@ -247,7 +247,7 @@ def merge(input_ortho_and_ortho_cuts, output_orthophoto, orthophoto_vars={}):
     profile.update()
 
     # create destination file
-    with rasterio.open(output_orthophoto, "w", **profile) as dstrast:
+    with rasterio.open(output_orthophoto, "w", BIGTIFF="IF_SAFER", **profile) as dstrast:
         dstrast.colorinterp = colorinterp
         for idx, dst_window in dstrast.block_windows():
             left, bottom, right, top = dstrast.window_bounds(dst_window)
