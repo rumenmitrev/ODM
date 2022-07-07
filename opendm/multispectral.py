@@ -25,12 +25,6 @@ def dn_to_radiance(photo, image):
     image = image.astype("float32")
     if len(image.shape) != 3:
         raise ValueError("Image should have shape length of 3 (got: %s)" % len(image.shape))
-
-    # Handle thermal bands (experimental)
-    if photo.band_name == 'LWIR':
-        image -= (273.15 * 100.0) # Convert Kelvin to Celsius
-        image *= 0.01
-        return image
     
     ######################################################################################################################### Cam(Seq)++
     if photo.camera_make == 'Parrot' and photo.camera_model == 'Sequoia':                                                   # Cam(Seq)++
@@ -124,6 +118,10 @@ def dn_to_radiance(photo, image):
         return image * photo.fnumber * photo.fnumber / exposure_msec / gain                                                 # Cam(P4M)++
                                                                                                                             # Cam(P4M)++
     ######################################################################################################################### Cam(P4M)++
+    # Thermal (this should never happen, but just in case..)
+    if photo.is_thermal():
+        return image
+
     # All others
     a1, a2, a3 = photo.get_radiometric_calibration()
     dark_level = photo.get_dark_level()
@@ -410,6 +408,8 @@ def compute_band_maps(multi_camera, primary_band):
 
                 if band['name'] != band_name:
                     p2s.setdefault(unique_id_map[uuid].filename, []).append(p)
+                    
+                # log.ODM_INFO("File %s <-- Capture %s" % (p.filename, uuid))    
 
         return s2p, p2s
     except Exception as e:
@@ -450,21 +450,23 @@ def compute_band_maps(multi_camera, primary_band):
 def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p, p2s, max_concurrency=1, max_samples=30):
     log.ODM_INFO("Computing band alignment")
 
+    use_local_warp_matrix = False
+
     alignment_info = {}
 
     # For each secondary band
     for band in multi_camera:
         if band['name'] != primary_band_name:
-            matrices = []
+            matrices_samples = []
 
             def parallel_compute_homography(p):
                 try:
-                    if len(matrices) >= max_samples:
+                    # Caculate the best warp matrix using a few samples in favor of performance
+                    if use_local_warp_matrix is not True and len(matrices_samples) >= max_samples:
                         # log.ODM_INFO("Got enough samples for %s (%s)" % (band['name'], max_samples))
                         return
 
-                    # Find good matrix candidates for alignment
-                
+                    # Find good matrix candidates for alignment                
                     primary_band_photo = s2p.get(p['filename'])
                     if primary_band_photo is None:
                         log.ODM_WARNING("Cannot find primary band photo for %s" % p['filename'])
@@ -476,7 +478,8 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
                     if warp_matrix is not None:
                         log.ODM_INFO("%s --> %s good match" % (p['filename'], primary_band_photo.filename))
 
-                        matrices.append({
+                        matrices_samples.append({
+                            'filename': p['filename'], # assume file name is unique
                             'warp_matrix': warp_matrix,
                             'eigvals': np.linalg.eigvals(warp_matrix),
                             'dimension': dimension,
@@ -491,21 +494,44 @@ def compute_alignment_matrices(multi_camera, primary_band_name, images_path, s2p
 
             # Find the matrix that has the most common eigvals
             # among all matrices. That should be the "best" alignment.
-            for m1 in matrices:
+            for m1 in matrices_samples:
                 acc = np.array([0.0,0.0,0.0])
                 e = m1['eigvals']
 
-                for m2 in matrices:
+                for m2 in matrices_samples:
                     acc += abs(e - m2['eigvals'])
 
                 m1['score'] = acc.sum()
             
             # Sort
-            matrices.sort(key=lambda x: x['score'], reverse=False)
+            matrices_samples.sort(key=lambda x: x['score'], reverse=False)                        
             
-            if len(matrices) > 0:
-                alignment_info[band['name']] = matrices[0]
-                log.ODM_INFO("%s band will be aligned using warp matrix %s (score: %s)" % (band['name'], matrices[0]['warp_matrix'], matrices[0]['score']))
+            if len(matrices_samples) > 0:
+                best_candidate = matrices_samples[0]
+
+                # Alignment matrices for all shots
+                matrices_all = []
+                
+                for photo in [{'filename': p.filename} for p in band['photos']]:
+                    local_warp_matrix = next((item for item in matrices_samples if item['filename'] == photo['filename']), None) # matrices_samples is a list
+
+                    if use_local_warp_matrix and local_warp_matrix is not None:
+                        matrices_all.append(local_warp_matrix)
+                    else:
+                        matrices_all.append({
+                            'filename': photo['filename'],
+                            'warp_matrix': best_candidate['warp_matrix'],
+                            'eigvals': best_candidate['eigvals'],
+                            'dimension': best_candidate['dimension'],
+                            'algo': best_candidate['algo']
+                        })
+
+                alignment_info[band['name']] = matrices_all                
+
+                if use_local_warp_matrix:
+                    log.ODM_INFO("%s band will be aligned using local warp matrices %s" % (band['name'], matrices_all))
+                else:
+                    log.ODM_INFO("%s band will be aligned using global warp matrix %s (score: %s)" % (band['name'], best_candidate['warp_matrix'], best_candidate['score']))
             else:
                 log.ODM_WARNING("Cannot find alignment matrix for band %s, The band might end up misaligned!" % band['name'])
 
@@ -557,12 +583,24 @@ def compute_homography(image_filename, align_image_filename):
 
             return h, (align_image_gray.shape[1], align_image_gray.shape[0])
         
-        algo = 'feat'
-        result = compute_using(find_features_homography)
+        warp_matrix = None
+        dimension = None
+        algo = None
 
-        if result[0] is None:
+        if max_dim > 320: # Try feature based approach first
+            algo = 'feat'
+            result = compute_using(find_features_homography)
+            
+            if result[0] is None:
+                algo = 'ecc'
+                log.ODM_INFO("Can't use features matching, will use ECC (this might take a bit)")
+                result = compute_using(find_ecc_homography)
+                if result[0] is None:
+                    algo = None
+
+        else: # ECC only for low resolution images
             algo = 'ecc'
-            log.ODM_INFO("Can't use features matching, will use ECC (this might take a bit)")
+            log.ODM_INFO("Skip features matching due to low resolution, will use ECC (this might take a bit)")
             result = compute_using(find_ecc_homography)
             if result[0] is None:
                 algo = None
@@ -572,27 +610,30 @@ def compute_homography(image_filename, align_image_filename):
 
     except Exception as e:
         log.ODM_WARNING("Compute homography: %s" % str(e))
-        return None, None, (None, None)
+        return None, (None, None), None
 
-def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000, termination_eps=1e-8, start_eps=1e-4):
+def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000, termination_eps=1e-6, start_eps=1e-4):
+    # Resize images to same size
+    if image_gray.shape[0] != align_image_gray.shape[0]:
+        interpolation_mode = cv2.INTER_CUBIC if (image_gray.shape[0] < align_image_gray.shape[0] and 
+                        image_gray.shape[1] < align_image_gray.shape[1]) else cv2.INTER_AREA
+        image_gray = cv2.resize(image_gray, None, 
+                        fx=align_image_gray.shape[1]/image_gray.shape[1], 
+                        fy=align_image_gray.shape[0]/image_gray.shape[0],
+                        interpolation=interpolation_mode)
+
+    # Major props to Alexander Reynolds for his insight into the pyramided matching process found at
+    # https://stackoverflow.com/questions/45997891/cv2-motion-euclidean-for-the-warp-mode-in-ecc-image-alignment-method
     pyramid_levels = 0
-    h,w = image_gray.shape
+    h,w = align_image_gray.shape
     min_dim = min(h, w)
 
     while min_dim > 300:
         min_dim /= 2.0
         pyramid_levels += 1
     
-    log.ODM_INFO("Pyramid levels: %s" % pyramid_levels)
+    log.ODM_INFO("Pyramid levels: %s" % pyramid_levels)   
     
-    # Quick check on size
-    if align_image_gray.shape[0] != image_gray.shape[0]:
-        align_image_gray = to_8bit(align_image_gray)
-        image_gray = to_8bit(image_gray)
-        image_gray = cv2.resize(image_gray, None, 
-                        fx=align_image_gray.shape[1]/image_gray.shape[1], 
-                        fy=align_image_gray.shape[0]/image_gray.shape[0],
-                        interpolation=cv2.INTER_AREA)
 
     # Build pyramids
     image_gray_pyr = [image_gray]
@@ -606,8 +647,9 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
         align_image_pyr.insert(0, cv2.resize(align_image_pyr[0], None, fx=1/2, fy=1/2,
                                 interpolation=cv2.INTER_AREA))
 
-    # Define the motion model
+    # Define the motion model, scale the initial warp matrix to smallest level
     warp_matrix = np.eye(3, 3, dtype=np.float32)
+    warp_matrix = warp_matrix * np.array([[1,1,2],[1,1,2],[0.5,0.5,1]], dtype=np.float32)**(1-(pyramid_levels+1))
 
     for level in range(pyramid_levels+1):
         ig = gradient(gaussian(image_gray_pyr[level]))
@@ -623,14 +665,17 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
                 number_of_iterations, eps)
 
         try:
-            log.ODM_INFO("Computing ECC pyramid level %s" % level)
-            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=9)
+            gaussian_filter_size = 5
+            log.ODM_INFO("Computing ECC pyramid level %s using Gaussian filter size %s" % (level, gaussian_filter_size))            
+            _, warp_matrix = cv2.findTransformECC(ig, aig, warp_matrix, cv2.MOTION_HOMOGRAPHY, criteria, inputMask=None, gaussFiltSize=gaussian_filter_size)
         except Exception as e:
             if level != pyramid_levels:
                 log.ODM_INFO("Could not compute ECC warp_matrix at pyramid level %s, resetting matrix" % level)
                 warp_matrix = np.eye(3, 3, dtype=np.float32)
+                warp_matrix = warp_matrix * np.array([[1,1,2],[1,1,2],[0.5,0.5,1]], dtype=np.float32)**(1-(pyramid_levels+1))
             else:
                 raise e
+            
 
         if level != pyramid_levels: 
             warp_matrix = warp_matrix * np.array([[1,1,2],[1,1,2],[0.5,0.5,1]], dtype=np.float32)
@@ -638,28 +683,59 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
     return warp_matrix
 
 
-def find_features_homography(image_gray, align_image_gray, feature_retention=0.25):
+def find_features_homography(image_gray, align_image_gray, feature_retention=0.7, min_match_count=10):
+    # Quick check on size
+    if align_image_gray.shape[0] != image_gray.shape[0]:
+        interpolation_mode = cv2.INTER_CUBIC if (image_gray.shape[0] < align_image_gray.shape[0] and 
+                        image_gray.shape[1] < align_image_gray.shape[1]) else cv2.INTER_AREA
+        align_image_gray = to_8bit(align_image_gray, force_normalize=True)
+        image_gray = to_8bit(image_gray, force_normalize=True)
+        image_gray = cv2.resize(image_gray, None, 
+                        fx=align_image_gray.shape[1]/image_gray.shape[1], 
+                        fy=align_image_gray.shape[0]/image_gray.shape[0],
+                        interpolation=interpolation_mode)
+
     # Detect SIFT features and compute descriptors.
-    detector = cv2.SIFT_create(edgeThreshold=10, contrastThreshold=0.1)
+    detector = cv2.SIFT_create() # edgeThreshold=10, contrastThreshold=0.1 (default 0.04)
     kp_image, desc_image = detector.detectAndCompute(image_gray, None)
     kp_align_image, desc_align_image = detector.detectAndCompute(align_image_gray, None)
 
     # Match
-    bf = cv2.BFMatcher(cv2.NORM_L1,crossCheck=True)
-    try:
-        matches = bf.match(desc_image, desc_align_image)
-    except Exception as e:
-        log.ODM_INFO("Cannot match features")
-        return None
+    # bf = cv2.BFMatcher(cv2.NORM_L1,crossCheck=True)
+    # try:
+    #    matches = bf.match(desc_image, desc_align_image)
+    # except Exception as e:
+    #    log.ODM_INFO("Cannot match features")
+    #    return None
 
     # Sort by score
-    matches.sort(key=lambda x: x.distance, reverse=False)
+    # matches.sort(key=lambda x: x.distance, reverse=False)
 
     # Remove bad matches
-    num_good_matches = int(len(matches) * feature_retention)
-    matches = matches[:num_good_matches]
+    # num_good_matches = int(len(matches) * feature_retention)
+    # matches = matches[:num_good_matches]
 
-    if len(matches) < 4:
+    # Use FLANN based method to match keypoints
+    FLANN_INDEX_KDTREE = 1
+    index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+    search_params = dict(checks=50)
+
+    flann = cv2.FlannBasedMatcher(index_params, search_params)
+    try:
+        matches = flann.knnMatch(desc_image, desc_align_image, k=2)
+    except Exception as e:
+        log.ODM_INFO("Cannot match features")
+        return None    
+
+    # Filter good matches following Lowe's ratio test
+    good_matches = []
+    for m, n in matches:
+        if m.distance < feature_retention * n.distance:
+            good_matches.append(m)
+
+    matches = good_matches
+
+    if len(matches) < min_match_count:
         log.ODM_INFO("Insufficient features: %s" % len(matches))
         return None
 
