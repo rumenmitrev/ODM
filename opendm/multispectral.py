@@ -566,7 +566,6 @@ def find_features_homography(image_gray, align_image_gray, feature_retention=0.7
     # Debug
     # imMatches = cv2.drawMatches(im1, kp_image, im2, kp_align_image, matches, None)
     # cv2.imwrite("matches.jpg", imMatches)
-    log.ODM_INFO("Good feature matches: %s" % len(matches))
 
     # Extract location of good matches
     points_image = np.zeros((len(matches), 2), dtype=np.float32)
