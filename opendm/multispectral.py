@@ -634,6 +634,18 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
     
     log.ODM_INFO("Pyramid levels: %s" % pyramid_levels)   
     
+    # Quick check on size
+    if align_image_gray.shape[0] != image_gray.shape[0]:
+        align_image_gray = to_8bit(align_image_gray)
+        image_gray = to_8bit(image_gray)
+
+        fx = align_image_gray.shape[1]/image_gray.shape[1]
+        fy = align_image_gray.shape[0]/image_gray.shape[0]
+
+        image_gray = cv2.resize(image_gray, None, 
+                        fx=fx, 
+                        fy=fy,
+                        interpolation=(cv2.INTER_AREA if (fx < 1.0 and fy < 1.0) else cv2.INTER_LANCZOS4))
 
     # Build pyramids
     image_gray_pyr = [image_gray]
