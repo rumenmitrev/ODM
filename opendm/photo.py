@@ -368,10 +368,12 @@ class ODM_Photo:
                     ######################################################################################################### UUID++
                     # self.set_attr_from_xmp_tag('capture_uuid', xtags, [                                                   # UUID--
                     #     '@drone-dji:CaptureUUID', # DJI                                                                   # UUID--
+                    #     'MicaSense:CaptureId', # MicaSense Altum                                                          # UUID--
                     #     '@Camera:ImageUniqueID', # sentera 6x                                                             # UUID--
                     # ])                                                                                                    # UUID--
                     self.set_attr_from_xmp_tag('capture_uuid', xtags, [                                                     # UUID++
                         '@drone-dji:CaptureUUID', # DJI                                                                     # UUID++
+                        'MicaSense:CaptureId', # MicaSense Altum                                                            # UUID++
                         '@Camera:ImageUniqueID', # sentera 6x                                                               # UUID++
                         '@Camera:CaptureUUID',                  # Sequoia                                                   # UUID(Seq)++
                     ])                                                                                                      # UUID++
