@@ -106,9 +106,6 @@ def dn_to_radiance(photo, image):
         log.ODM_DEBUG("MulA,  {},  (-= Dark, /= 65536.0),  {},".format(photo.filename, photo.p4m_dark))                     # Cam(P4M)++
                                                                                                                             # Cam(P4M)++
         V, x, y = vignette_map(photo)                                                                                       # Cam(P4M)++
-        if x is None:                                                                                                       # Cam(P4M)++
-            x, y = np.meshgrid(np.arange(photo.width), np.arange(photo.height))                                             # Cam(P4M)++
-            log.ODM_DEBUG("MulB,  {},  meshgrid".format(photo.filename))                                                    # Cam(P4M)++
         if V is not None:                                                                                                   # Cam(P4M)++
             V = np.repeat(V[:, :, np.newaxis], image.shape[2], axis=2)                                                      # Cam(P4M)++
             image *= V                                                                                                      # Cam(P4M)++
@@ -194,7 +191,11 @@ def vignette_map(photo):
         # compute the vignette polynomial for each distance - we divide by the polynomial so that the
         # corrected image is image_corrected = image_original * vignetteCorrection
 
-        vignette = 1.0 / np.polyval(vignette_poly, r)
+        ##################################################################################################################### Vignet++
+        # vignette = 1.0 / np.polyval(vignette_poly, r)                                                                     # Vignet--
+        vignette = np.polyval(vignette_poly, r)                                                                             # Vignet++
+                                                                                                                            # Vignet++
+        ##################################################################################################################### Vignet++
         return vignette, x, y
     
     return None, None, None
