@@ -245,7 +245,7 @@ class OSFMContext:
                 "reconstruction_algorithm: %s" % (args.sfm_algorithm),
                 "undistorted_image_format: tif",
                 "bundle_outlier_filtering_type: AUTO",
-                "sift_peak_threshold: 0.066",
+                "sift_peak_threshold: 0.012",
                 "align_orientation_prior: vertical",
                 "triangulation_type: ROBUST",
                 "retriangulation_ratio: 2",

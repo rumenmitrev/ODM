@@ -11,6 +11,9 @@ from collections import deque
 
 from opendm import context
 from opendm import log
+############################################################################################################################# WC++
+from opendm import types                                                                                                    # WC++
+############################################################################################################################# WC++
 
 class SubprocessException(Exception):
     def __init__(self, msg, errorCode):
@@ -69,6 +72,18 @@ def run(cmd, env_paths=[context.superbuild_bin_path], env_vars={}, packages_path
     """Run a system command"""
     global running_subprocesses
 
+    ######################################################################################################################### WC++
+    types.ODM_Stage.WC_step1 = now_raw().replace(microsecond = 0)                                                           # WC++
+    timedelta_step = types.ODM_Stage.WC_step1 - types.ODM_Stage.WC_step0                                                    # WC++
+    if timedelta_step.total_seconds() < 5:                                                          # Logging threshold     # WC++
+        log.ODM_INFO('##### {}                 step=-------  WC_startX ({})  {}'.format(                                    # WC++
+                types.ODM_Stage.WC_step1 - types.ODM_Stage.WC_job0, types.ODM_Stage.WC_stage, cmd[:75]))                    # WC++
+    else:                                                                                                                   # WC++
+        log.ODM_INFO('##### {}                 step={}  WC_STARTX ({})  {}'.format(                                         # WC++
+                types.ODM_Stage.WC_step1 - types.ODM_Stage.WC_job0, timedelta_step, types.ODM_Stage.WC_stage, cmd[:75]))    # WC++
+    types.ODM_Stage.WC_step0 = types.ODM_Stage.WC_step1                                                                     # WC++
+                                                                                                                            # WC++
+    ######################################################################################################################### WC++
     log.ODM_INFO('running %s' % cmd)
     env = os.environ.copy()
 
@@ -104,6 +119,18 @@ def run(cmd, env_paths=[context.superbuild_bin_path], env_vars={}, packages_path
         raise SubprocessException("Child was terminated by signal {}".format(-retcode), -retcode)
     elif retcode > 0:
         raise SubprocessException("Child returned {}".format(retcode), retcode)
+    ######################################################################################################################### WC++
+    types.ODM_Stage.WC_step1 = now_raw().replace(microsecond = 0)                                                           # WC++
+    timedelta_step = types.ODM_Stage.WC_step1 - types.ODM_Stage.WC_step0                                                    # WC++
+    if timedelta_step.total_seconds() < 5:                                                          # Logging threshold     # WC++
+        log.ODM_INFO('##### {}                 step=-------  WC_finX    {}   {}'.format(                                    # WC++
+                types.ODM_Stage.WC_step1 - types.ODM_Stage.WC_job0, types.ODM_Stage.WC_stage, cmd[:75]))                    # WC++
+    else:                                                                                                                   # WC++
+        log.ODM_INFO('##### {}                 step={}  WC_FINX    {}   {}'.format(                                         # WC++
+                types.ODM_Stage.WC_step1 - types.ODM_Stage.WC_job0, timedelta_step, types.ODM_Stage.WC_stage, cmd[:75]))    # WC++
+    types.ODM_Stage.WC_step0 = types.ODM_Stage.WC_step1                                                                     # WC++
+                                                                                                                            # WC++
+    ######################################################################################################################### WC++
 
 
 def now():

@@ -26,6 +26,7 @@ class ODM_Reconstruction(object):
         self.georef = None
         self.gcp = None
         self.multi_camera = self.detect_multi_camera()
+        self.filter_photos()
 
     def detect_multi_camera(self):
         """
@@ -63,6 +64,29 @@ class ODM_Reconstruction(object):
             return mc
 
         return None
+
+    def filter_photos(self):
+        if not self.multi_camera:
+            return # Nothing to do, use all images
+        
+        else:
+            # Sometimes people might try process both RGB + Blue/Red/Green bands
+            # because these are the contents of the SD card from a drone (e.g. DJI P4 Multispectral)
+            # But we don't want to process both, so we discard the RGB files in favor
+            bands = {}
+            for b in self.multi_camera:
+                bands[b['name'].lower()] = b['name']
+
+            if ('rgb' in bands or 'redgreenblue' in bands) and \
+                ('red' in bands and 'green' in bands and 'blue' in bands):
+                band_to_remove = bands['rgb'] if 'rgb' in bands else bands['redgreenblue']
+
+                self.multi_camera = [b for b in self.multi_camera if b['name'] != band_to_remove]
+                photos_before = len(self.photos)
+                self.photos = [p for p in self.photos if p.band_name != band_to_remove]
+                photos_after = len(self.photos)
+
+                log.ODM_WARNING("RGB images detected alongside individual Red/Green/Blue images, we will use individual bands (skipping %s images)" % (photos_before - photos_after))
 
     def is_georeferenced(self):
         return self.georef is not None
@@ -296,6 +320,15 @@ class ODM_Tree(object):
 
 
 class ODM_Stage:
+    ######################################################################################################################### WC++ Wall Clock
+    WC_job0 = None          # job   : start time                                                                            # WC++
+    WC_stage = None         # stage : name                                                                                  # WC++
+    WC_stage0 = None        # stage : start time                                                                            # WC++
+    WC_stage1 = None        # stage : stop  time                                                                            # WC++
+    WC_step0 = None         # step  : start time                                                                            # WC++
+    WC_step1 = None         # step  : stop  time                                                                            # WC++
+                                                                                                                            # WC++
+    ######################################################################################################################### WC++
     def __init__(self, name, args, progress=0.0, **params):
         self.name = name
         self.args = args
@@ -305,6 +338,12 @@ class ODM_Stage:
             self.params = {}
         self.next_stage = None
         self.prev_stage = None
+        ##################################################################################################################### WC++
+        ODM_Stage.WC_job0 = system.now_raw().replace(microsecond = 0)                                                       # WC++
+        ODM_Stage.WC_stage0 = ODM_Stage.WC_job0                                                                             # WC++
+        ODM_Stage.WC_step0  = ODM_Stage.WC_job0                                                                             # WC++
+                                                                                                                            # WC++
+        ##################################################################################################################### WC++
 
     def connect(self, stage):
         self.next_stage = stage
@@ -323,7 +362,21 @@ class ODM_Stage:
         start_time = system.now_raw()
         log.logger.log_json_stage_run(self.name, start_time)
 
-        log.ODM_INFO('Running %s stage' % self.name)
+        ##################################################################################################################### WC++
+        # log.ODM_INFO('Running %s stage' % self.name)                                                                      # WC--
+        ODM_Stage.WC_stage = self.name                                                                                      # WC++
+        ODM_Stage.WC_stage1 = start_time.replace(microsecond = 0)                                                           # WC++
+        timedelta_stage = ODM_Stage.WC_stage1 - ODM_Stage.WC_stage0                                                         # WC++
+        if timedelta_stage.total_seconds() < 5:                                                     # Logging threshold     # WC++
+            log.ODM_INFO('##### {}  stage=-------                WC_start  ({})'.format(                                    # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, ODM_Stage.WC_stage))                                           # WC++
+        else:                                                                                                               # WC++
+            log.ODM_INFO('##### {}  stage={}                WC_START  ({})'.format(                                         # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, timedelta_stage, ODM_Stage.WC_stage))                          # WC++
+        ODM_Stage.WC_stage0 = ODM_Stage.WC_stage1                                                                           # WC++
+        ODM_Stage.WC_step0  = ODM_Stage.WC_stage1                                                                           # WC++
+                                                                                                                            # WC++
+        ##################################################################################################################### WC++
         
         self.process(self.args, outputs)
 
@@ -334,7 +387,20 @@ class ODM_Stage:
         if self.args.time:
             system.benchmark(start_time, outputs['tree'].benchmarking, self.name)
 
-        log.ODM_INFO('Finished %s stage' % self.name)
+        ##################################################################################################################### WC++
+        # log.ODM_INFO('Finished %s stage' % self.name)                                                                     # WC--
+        ODM_Stage.WC_stage1 = system.now_raw().replace(microsecond = 0)                                                     # WC++
+        timedelta_stage = ODM_Stage.WC_stage1 - ODM_Stage.WC_stage0                                                         # WC++
+        if timedelta_stage.total_seconds() < 5:                                                     # Logging threshold     # WC++
+            log.ODM_INFO('##### {}  stage=-------                WC_fin     {}'.format(                                     # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, ODM_Stage.WC_stage))                                           # WC++
+        else:                                                                                                               # WC++
+            log.ODM_INFO('##### {}  stage={}                WC_FIN     {}'.format(                                          # WC++
+                    ODM_Stage.WC_stage1 - ODM_Stage.WC_job0, timedelta_stage, ODM_Stage.WC_stage))                          # WC++
+        ODM_Stage.WC_stage0 = ODM_Stage.WC_stage1                                                                           # WC++
+        ODM_Stage.WC_step0  = ODM_Stage.WC_stage1                                                                           # WC++
+                                                                                                                            # WC++
+        ##################################################################################################################### WC++
         self.update_progress_end()
 
         # Last stage?
