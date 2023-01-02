@@ -1,8 +1,9 @@
-set(_proj_name entwine)
+set(_proj_name pdal-python)
 set(_SB_BINARY_DIR "${SB_BINARY_DIR}/${_proj_name}")
 
-if (NOT WIN32)
-  set(EXTRA_CMAKE_ARGS -DCMAKE_CXX_FLAGS=-isystem\ ${SB_SOURCE_DIR}/pdal)
+if (WIN32)
+  set(PP_EXTRA_ARGS -DPYTHON3_EXECUTABLE=${PYTHON_EXE_PATH}
+                    -DPython3_NumPy_INCLUDE_DIRS=${PYTHON_HOME}/lib/site-packages/numpy/core/include)
 endif()
 
 ExternalProject_Add(${_proj_name}
@@ -12,19 +13,18 @@ ExternalProject_Add(${_proj_name}
   STAMP_DIR         ${_SB_BINARY_DIR}/stamp
   #--Download step--------------
   DOWNLOAD_DIR      ${SB_DOWNLOAD_DIR}
-  GIT_REPOSITORY    https://github.com/OpenDroneMap/entwine/
-  GIT_TAG           290
+  GIT_REPOSITORY    https://github.com/OpenDroneMap/pdal-python
+  GIT_TAG           main
   #--Update/Patch step----------
   UPDATE_COMMAND    ""
   #--Configure step-------------
   SOURCE_DIR        ${SB_SOURCE_DIR}/${_proj_name}
   CMAKE_ARGS
-    ${EXTRA_CMAKE_ARGS}
-    -DADDITIONAL_LINK_DIRECTORIES_PATHS=${SB_INSTALL_DIR}/lib
-    -DWITH_TESTS=OFF
-    -DWITH_ZSTD=OFF
+    -DPDAL_DIR=${SB_INSTALL_DIR}/lib/cmake/PDAL
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-    -DCMAKE_INSTALL_PREFIX:PATH=${SB_INSTALL_DIR}
+    -DCMAKE_INSTALL_PREFIX:PATH=${SB_INSTALL_DIR}/lib/python3.8/dist-packages
+    ${WIN32_CMAKE_ARGS}
+    ${PP_EXTRA_ARGS}
   #--Build step-----------------
   BINARY_DIR        ${_SB_BINARY_DIR}
   #--Install step---------------

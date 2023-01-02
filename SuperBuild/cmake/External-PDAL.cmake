@@ -3,6 +3,8 @@ set(_SB_BINARY_DIR "${SB_BINARY_DIR}/${_proj_name}")
 
 if (WIN32)
 set(LASZIP_LIB "${SB_INSTALL_DIR}/lib/laszip.lib")
+elseif(APPLE)
+set(LASZIP_LIB "${SB_INSTALL_DIR}/lib/liblaszip.dylib")
 else()
 set(LASZIP_LIB "${SB_INSTALL_DIR}/lib/liblaszip.so")
 endif()
@@ -14,7 +16,7 @@ ExternalProject_Add(${_proj_name}
   STAMP_DIR         ${_SB_BINARY_DIR}/stamp
   #--Download step--------------
   DOWNLOAD_DIR      ${SB_DOWNLOAD_DIR}
-  URL               https://github.com/PDAL/PDAL/archive/refs/tags/2.3RC1.zip
+  URL               https://github.com/PDAL/PDAL/archive/refs/tags/2.4.3.zip
   #--Update/Patch step----------
   UPDATE_COMMAND    ""
   #--Configure step-------------
@@ -58,3 +60,4 @@ ExternalProject_Add(${_proj_name}
   LOG_CONFIGURE     OFF
   LOG_BUILD         OFF
 )
+

@@ -83,15 +83,6 @@ def config(argv=None, parser=None):
                         nargs='?',
                         help='Name of dataset (i.e subfolder name within project folder). Default: %(default)s')
 
-    parser.add_argument('--resize-to',
-                        metavar='<integer>',
-                        action=StoreValue,
-                        default=2048,
-                        type=int,
-                        help='Legacy option (use --feature-quality instead). Resizes images by the largest side for feature extraction purposes only. '
-                             'Set to -1 to disable. This does not affect the final orthophoto '
-                             'resolution quality and will not resize the original images. Default: %(default)s')
-
     parser.add_argument('--end-with', '-e',
                         metavar='<string>',
                         action=StoreValue,
@@ -212,15 +203,6 @@ def config(argv=None, parser=None):
                               'processes. Peak memory requirement is ~1GB per '
                               'thread and 2 megapixel image resolution. Default: %(default)s'))
 
-    parser.add_argument('--depthmap-resolution',
-                        metavar='<positive float>',
-                        action=StoreValue,
-                        type=float,
-                        default=640,
-                        help=('Controls the density of the point cloud by setting the resolution of the depthmap images. Higher values take longer to compute '
-                              'but produce denser point clouds. Overrides the value calculated by --pc-quality.'
-                              'Default: %(default)s'))
-
     parser.add_argument('--use-hybrid-bundle-adjustment',
                         action=StoreTrue,
                         nargs=0,
@@ -242,6 +224,12 @@ def config(argv=None, parser=None):
                 nargs=0,
                 default=False,
                 help='Automatically compute image masks using AI to remove the sky. Experimental. Default: %(default)s')
+    
+    parser.add_argument('--bg-removal',
+                action=StoreTrue,
+                nargs=0,
+                default=False,
+                help='Automatically compute image masks using AI to remove the background. Experimental. Default: %(default)s')
 
     parser.add_argument('--use-3dmesh',
                     action=StoreTrue,
@@ -408,13 +396,6 @@ def config(argv=None, parser=None):
                         help='Reduce the memory usage needed for depthmap fusion by splitting large scenes into tiles. Turn this on if your machine doesn\'t have much RAM and/or you\'ve set --pc-quality to high or ultra. Experimental. '
                              'Default: %(default)s')
 
-    parser.add_argument('--pc-geometric',
-                        action=StoreTrue,
-                        nargs=0,
-                        default=False,
-                        help='Improve the accuracy of the point cloud by computing geometrically consistent depthmaps. This increases processing time, but can improve results in urban scenes. '
-                             'Default: %(default)s')    
-
     parser.add_argument('--smrf-scalar',
                         metavar='<positive float>',
                         action=StoreValue,
@@ -447,20 +428,6 @@ def config(argv=None, parser=None):
         help='Simple Morphological Filter window radius parameter (meters). '
                 'Default: %(default)s')
 
-    parser.add_argument('--texturing-data-term',
-                        metavar='<string>',
-                        action=StoreValue,
-                        default='gmi',
-                        choices=['gmi', 'area'],
-                        help=('When texturing the 3D mesh, for each triangle, choose to prioritize images with sharp features (gmi) or those that cover the largest area (area). Default: %(default)s'))
-
-    parser.add_argument('--texturing-outlier-removal-type',
-                        metavar='<string>',
-                        action=StoreValue,
-                        default='gauss_clamping',
-                        choices=['none', 'gauss_clamping', 'gauss_damping'],
-                        help=('Type of photometric outlier removal method. Can be one of: %(choices)s. Default: %(default)s'))
-
     parser.add_argument('--texturing-skip-global-seam-leveling',
                         action=StoreTrue,
                         nargs=0,
@@ -480,15 +447,6 @@ def config(argv=None, parser=None):
                         help=('Keep faces in the mesh that are not seen in any camera. '
                               'Default:  %(default)s'))
 
-    parser.add_argument('--texturing-tone-mapping',
-                        metavar='<string>',
-                        action=StoreValue,
-                        choices=['none', 'gamma'],
-                        default='none',
-                        help='Turn on gamma tone mapping or none for no tone '
-                             'mapping. Can be one of %(choices)s. '
-                             'Default: %(default)s ')
-
     parser.add_argument('--gcp',
                         metavar='<path string>',
                         action=StoreValue,
@@ -506,12 +464,20 @@ def config(argv=None, parser=None):
                         action=StoreValue,
                         default=None,
                         help=('Path to the image geolocation file containing the camera center coordinates used for georeferencing. '
-                              'Note that omega/phi/kappa are currently not supported (you can set them to 0). '
+                              'If you don''t have values for omega/phi/kappa you can set them to 0. '
                               'The file needs to '
                               'use the following format: \n'
                               'EPSG:<code> or <+proj definition>\n'
                               'image_name geo_x geo_y geo_z [omega (degrees)] [phi (degrees)] [kappa (degrees)] [horz accuracy (meters)] [vert accuracy (meters)]\n'
                               'Default: %(default)s'))
+    
+    parser.add_argument('--align',
+                    metavar='<path string>',
+                    action=StoreValue,
+                    default=None,
+                    help=('Path to a GeoTIFF DEM or a LAS/LAZ point cloud '
+                            'that the reconstruction outputs should be automatically aligned to. Experimental. '
+                            'Default: %(default)s'))
 
     parser.add_argument('--use-exif',
                         action=StoreTrue,
@@ -586,7 +552,7 @@ def config(argv=None, parser=None):
                         default=False,
                         help='Set this parameter if you want a striped GeoTIFF. '
                              'Default: %(default)s')
-    
+
     parser.add_argument('--orthophoto-png',
                         action=StoreTrue,
                         nargs=0,
@@ -600,7 +566,6 @@ def config(argv=None, parser=None):
                         default=False,
                         help='Set this parameter if you want to generate a Google Earth (KMZ) rendering of the orthophoto. '
                              'Default: %(default)s')    
-    
 
     parser.add_argument('--orthophoto-compression',
                         metavar='<string>',
@@ -664,31 +629,10 @@ def config(argv=None, parser=None):
                         default=False,
                         help='Create Cloud-Optimized GeoTIFFs instead of normal GeoTIFFs. Default: %(default)s')
 
-
-    parser.add_argument('--verbose', '-v',
-                        action=StoreTrue,
-                        nargs=0,
-                        default=False,
-                        help='Print additional messages to the console. '
-                             'Default: %(default)s')
-    
     parser.add_argument('--copy-to',
                         metavar='<path>',
                         action=StoreValue,
                         help='Copy output results to this folder after processing.')
-
-    parser.add_argument('--time',
-                        action=StoreTrue,
-                        nargs=0,
-                        default=False,
-                        help='Generates a benchmark file with runtime info. '
-                             'Default: %(default)s')
-    
-    parser.add_argument('--debug',
-                        action=StoreTrue,
-                        nargs=0,
-                        default=False,
-                        help='Print debug messages. Default: %(default)s')
 
     parser.add_argument('--version',
                         action='version',
@@ -725,11 +669,12 @@ def config(argv=None, parser=None):
                               'The file needs to use the following format: \n'
                               'image_name group_name\n'
                               'Default: %(default)s'))
-    # parser.add_argument('--split-multitracks',
-    #                    action=StoreTrue,
-    #                    nargs=0,
-    #                    default=False,
-    #                    help='Split multi-track reconstructions.')
+
+    parser.add_argument('--sm-no-align',
+                    action=StoreTrue,
+                    nargs=0,
+                    default=False,
+                    help='Skip alignment of submodels in split-merge. Useful if GPS is good enough on very large datasets. Default: %(default)s')
 
     parser.add_argument('--sm-cluster',
                         metavar='<string>',
@@ -804,7 +749,15 @@ def config(argv=None, parser=None):
                           'If the images have been postprocessed and are already aligned, use this option. '
                           'Default: %(default)s'))
 
-    args = parser.parse_args(argv)
+    args, unknown = parser.parse_known_args(argv)
+    DEPRECATED = ["--verbose", "--debug", "--time", "--resize-to", "--depthmap-resolution", "--pc-geometric", "--texturing-data-term", "--texturing-outlier-removal-type", "--texturing-tone-mapping"]
+    unknown_e = [p for p in unknown if p not in DEPRECATED]
+    if len(unknown_e) > 0:
+        raise parser.error("unrecognized arguments: %s" % " ".join(unknown_e))
+
+    for p in unknown:
+        if p in DEPRECATED:
+            log.ODM_WARNING("%s is no longer a valid argument and will be ignored!" % p)
 
     # check that the project path setting has been set properly
     if not args.project_path:

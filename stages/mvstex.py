@@ -68,10 +68,14 @@ class ODMMvsTexStage(types.ODM_Stage):
                 system.mkdir_p(r['out_dir'])
 
             odm_textured_model_obj = os.path.join(r['out_dir'], tree.odm_textured_model_obj)
+            unaligned_obj = io.related_file_path(odm_textured_model_obj, postfix="_unaligned")
 
             if not io.file_exists(odm_textured_model_obj) or self.rerun():
                 log.ODM_INFO('Writing MVS Textured file in: %s'
                               % odm_textured_model_obj)
+
+                if os.path.isfile(unaligned_obj):
+                    os.unlink(unaligned_obj)
 
                 # Format arguments to fit Mvs-Texturing app
                 skipGlobalSeamLeveling = ""
@@ -93,12 +97,12 @@ class ODMMvsTexStage(types.ODM_Stage):
                     'bin': context.mvstex_path,
                     'out_dir': os.path.join(r['out_dir'], "odm_textured_model_geo"),
                     'model': r['model'],
-                    'dataTerm': args.texturing_data_term,
-                    'outlierRemovalType': args.texturing_outlier_removal_type,
+                    'dataTerm': 'gmi',
+                    'outlierRemovalType': 'gauss_clamping',
                     'skipGlobalSeamLeveling': skipGlobalSeamLeveling,
                     'skipLocalSeamLeveling': skipLocalSeamLeveling,
                     'keepUnseenFaces': keepUnseenFaces,
-                    'toneMapping': args.texturing_tone_mapping,
+                    'toneMapping': 'none',
                     'nadirMode': nadir,
                     'maxTextureSize': '--max_texture_size=%s' % max_texture_size,
                     'nvm_file': r['nvm_file'],
