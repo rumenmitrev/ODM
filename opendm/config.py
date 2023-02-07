@@ -389,6 +389,13 @@ def config(argv=None, parser=None):
                         help='Filters the point cloud by keeping only a single point around a radius N (in meters). This can be useful to limit the output resolution of the point cloud and remove duplicate points. Set to 0 to disable sampling. '
                              'Default: %(default)s')
 
+    parser.add_argument('--pc-skip-geometric',
+                        action=StoreTrue,
+                        nargs=0,
+                        default=False,
+                        help='Geometric estimates improve the accuracy of the point cloud by computing geometrically consistent depthmaps but may not be usable in larger datasets. This flag disables geometric estimates. '
+                             'Default: %(default)s')
+
     parser.add_argument('--pc-tile',
                         action=StoreTrue,
                         nargs=0,
@@ -445,6 +452,20 @@ def config(argv=None, parser=None):
                         nargs=0,
                         default=False,
                         help=('Keep faces in the mesh that are not seen in any camera. '
+                              'Default:  %(default)s'))
+
+    parser.add_argument('--texturing-single-material',
+                        action=StoreTrue,
+                        nargs=0,
+                        default=False,
+                        help=('Generate OBJs that have a single material and a single texture file instead of multiple ones. '
+                              'Default:  %(default)s'))
+
+    parser.add_argument('--gltf',
+                        action=StoreTrue,
+                        nargs=0,
+                        default=False,
+                        help=('Generate single file Binary glTF (GLB) textured models. '
                               'Default:  %(default)s'))
 
     parser.add_argument('--gcp',
@@ -639,6 +660,20 @@ def config(argv=None, parser=None):
                         version='ODM {0}'.format(__version__),
                         help='Displays version number and exits. ')
 
+    parser.add_argument('--video-limit',
+                        type=int,
+                        action=StoreValue,
+                        default=500,
+                        metavar='<positive integer>',
+                        help='Maximum number of frames to extract from video files for processing. Set to 0 for no limit. Default: %(default)s')
+
+    parser.add_argument('--video-resolution',
+                        type=int,
+                        action=StoreValue,
+                        default=4000,
+                        metavar='<positive integer>',
+                        help='The maximum output resolution of extracted video frames in pixels. Default: %(default)s')
+    
     parser.add_argument('--split',
                         type=int,
                         action=StoreValue,

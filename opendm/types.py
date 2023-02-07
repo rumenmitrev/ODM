@@ -76,17 +76,27 @@ class ODM_Reconstruction(object):
             bands = {}
             for b in self.multi_camera:
                 bands[b['name'].lower()] = b['name']
+            
+            bands_to_remove = []
 
-            if ('rgb' in bands or 'redgreenblue' in bands) and \
-                ('red' in bands and 'green' in bands and 'blue' in bands):
-                band_to_remove = bands['rgb'] if 'rgb' in bands else bands['redgreenblue']
+            if 'rgb' in bands or 'redgreenblue' in bands:
+                if 'red' in bands and 'green' in bands and 'blue' in bands:
+                    bands_to_remove.append(bands['rgb'] if 'rgb' in bands else bands['redgreenblue'])
+                else:
+                    for b in ['red', 'green', 'blue']:
+                        if b in bands:
+                            bands_to_remove.append(bands[b])
 
-                self.multi_camera = [b for b in self.multi_camera if b['name'] != band_to_remove]
-                photos_before = len(self.photos)
-                self.photos = [p for p in self.photos if p.band_name != band_to_remove]
-                photos_after = len(self.photos)
+            if len(bands_to_remove) > 0:
+                log.ODM_WARNING("Redundant bands detected, probably because RGB images are mixed with single band images. We will trim some bands as needed")
 
-                log.ODM_WARNING("RGB images detected alongside individual Red/Green/Blue images, we will use individual bands (skipping %s images)" % (photos_before - photos_after))
+                for band_to_remove in bands_to_remove:
+                    self.multi_camera = [b for b in self.multi_camera if b['name'] != band_to_remove]
+                    photos_before = len(self.photos)
+                    self.photos = [p for p in self.photos if p.band_name != band_to_remove]
+                    photos_after = len(self.photos)
+
+                    log.ODM_WARNING("Skipping %s band (%s images)" % (band_to_remove, photos_before - photos_after))
 
     def is_georeferenced(self):
         return self.georef is not None
@@ -113,7 +123,7 @@ class ODM_Reconstruction(object):
                 # Convert GCP file to a UTM projection since the rest of the pipeline
                 # does not handle other SRS well.
                 rejected_entries = []
-                utm_gcp = GCPFile(gcp.create_utm_copy(output_gcp_file, filenames=[p.filename for p in self.photos], rejected_entries=rejected_entries, include_extras=False))
+                utm_gcp = GCPFile(gcp.create_utm_copy(output_gcp_file, filenames=[p.filename for p in self.photos], rejected_entries=rejected_entries, include_extras=True))
                 
                 if not utm_gcp.exists():
                     raise RuntimeError("Could not project GCP file to UTM. Please double check your GCP file for mistakes.")
@@ -289,6 +299,7 @@ class ODM_Tree(object):
 
         # texturing
         self.odm_textured_model_obj = 'odm_textured_model_geo.obj'
+        self.odm_textured_model_glb = 'odm_textured_model_geo.glb'
 
         # odm_georeferencing
         self.odm_georeferencing_coords = os.path.join(

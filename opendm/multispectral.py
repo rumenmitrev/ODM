@@ -421,6 +421,18 @@ def compute_homography(image_filename, align_image_filename):
 def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000, termination_eps=1e-8, start_eps=1e-4):
     pyramid_levels = 0
     h,w = image_gray.shape
+    max_dim = max(h, w)
+
+    max_size = 1280
+
+    if max_dim > max_size:
+        if max_dim == w:
+            f = max_size / w
+        else:
+            f = max_size / h
+        image_gray = cv2.resize(image_gray, None, fx=f, fy=f, interpolation=cv2.INTER_AREA)
+        h,w = image_gray.shape
+
     min_dim = min(h, w)
 
     while min_dim > 300:
@@ -434,10 +446,10 @@ def find_ecc_homography(image_gray, align_image_gray, number_of_iterations=1000,
         align_image_gray = to_8bit(align_image_gray)
         image_gray = to_8bit(image_gray)
 
-        fx = align_image_gray.shape[1]/image_gray.shape[1]
-        fy = align_image_gray.shape[0]/image_gray.shape[0]
+        fx = image_gray.shape[1]/align_image_gray.shape[1]
+        fy = image_gray.shape[0]/align_image_gray.shape[0]
 
-        image_gray = cv2.resize(image_gray, None, 
+        align_image_gray = cv2.resize(align_image_gray, None, 
                         fx=fx, 
                         fy=fy,
                         interpolation=(cv2.INTER_AREA if (fx < 1.0 and fy < 1.0) else cv2.INTER_LANCZOS4))
@@ -551,6 +563,8 @@ def local_normalize(im):
 
 
 def align_image(image, warp_matrix, dimension):
+    image = resize_match(image, dimension)
+
     if warp_matrix.shape == (3, 3):
         return cv2.warpPerspective(image, warp_matrix, dimension)
     else:
@@ -582,3 +596,16 @@ def to_8bit(image, force_normalize=False):
     return image
 
 
+def resize_match(image, dimension):
+    h, w = image.shape[0], image.shape[1]
+    mw, mh = dimension
+
+    if w != mw or h != mh:
+        fx = mw/w
+        fy = mh/h
+        image = cv2.resize(image, None, 
+                fx=fx, 
+                fy=fx,
+                interpolation=(cv2.INTER_AREA if (fx < 1.0 and fy < 1.0) else cv2.INTER_LANCZOS4))
+
+    return image
